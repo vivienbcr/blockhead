@@ -1,0 +1,22 @@
+[package]
+name = "bc-scrapper"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# import tokio 
+tokio = { version = "1.26.0", features = ["full"] }
+reqwest ={ version="0.11.14", default-features = false, features = ["rustls-tls"] }
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.93"
+serde_yaml = "0.9.19"
+openssl = { version = "0.10.45", features = ["vendored"] }
+warp = "0.3.3"
+prometheus = { version = "0.13.3", features = ["process"] }
+futures = { version = "0.3", default-features = false }
+rand = "0.8.5"
+once_cell = "1.17.1"
+config = { version= "0.13.3", features = ["yaml"] }
+async-trait = "0.1.67"

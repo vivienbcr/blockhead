@@ -1,0 +1,55 @@
+---
+# Global options apply per default to every protocol / network / endpoint
+global:
+  # head_length is the number of blocks to be fetched from the head of the chain
+  head_length: 5
+  # Gobal configuration for all endpoints, if not defined in endpoint, global will be used
+  endpoints:
+    # Retry define how many time worker will try to call instance if he fail
+    retry: 3
+    # Delay between every retry
+    delay: 1
+    # Couldown between every scrapping task
+    couldown: 4
+  server:
+    # On wich port json rpc will be served
+    port: 8080
+  metrics:
+    # With listenning port metrics will be served
+    port: 8081
+protocols:
+  bitcoin:
+    mainnet:
+      rpc:
+      - url: https://sample.bitcoin.mainnet.rpc
+      blockstream:
+        url: https://sample.bitcoin.mainnet.blockstream.api
+      blockcypher:
+        url: https://sample.bitcoin.mainnet.blockcypher.api
+  ethereum:
+    mainnet:
+      rpc:
+      - url: https://sample.eth.mainnet.rpc
+      infura:
+        url: https://sample.eth.mainnet.infura
+    sepolia:
+      rpc:
+      - url: https://sample.eth.sepolia.rpc
+      infura:
+        url: https://sample.eth.sepolia.infura
+  tezos:
+    mainnet:
+      rpc:
+      - url: https://sample.tezos.mainnet.rpc
+      tzkt:
+        url: https://sample.tezos.mainnet.tzkt.api
+      tzstats:
+        url: https://sample.tezos.mainnet.tzstats.api
+    ghostnet:
+      rpc:
+      - url: https://sample.tezos.ghostnet.rpc.api
+      tzkt:
+        url: https://sample.tezos.ghostnet.tzkt.api
+      tzstats:
+        url: https://sample.tezos.ghostnet.tzstats.api
+
