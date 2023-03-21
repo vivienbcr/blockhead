@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, error::Error};
 
 use config::{self, ConfigError, File};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Deserializer};
 use serde_json::Value;
+
+use crate::{endpoints::{bitcoin_node::BitcoinNode, blockstream::BlockstreamEndpoint}};
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 
@@ -13,11 +15,11 @@ pub struct Configuration {
     #[serde(deserialize_with = "deserialize_protocols")]
     pub protocols: HashMap<ProtocolName,HashMap<NetworkName,ProtoEndpoints>>,
 }
-
 fn deserialize_protocols<'de, D>(deserializer: D) -> Result<HashMap<ProtocolName, HashMap<NetworkName,ProtoEndpoints>>, D::Error>
 where
     D: Deserializer<'de>,
 {
+    println!("deserialize_protocols");
     let v: Value = Deserialize::deserialize(deserializer)?;
     let mut map = HashMap::new();
     for (proto_k, v) in v.as_object().unwrap() {
@@ -36,10 +38,25 @@ where
                 "ghostnet" => NetworkName::Ghostnet,
                 _ => return Err(serde::de::Error::custom(format!("Unknown or unsupported network: {} for protocol {}", k, proto_k))),
             };
+            println!("{}: {:?}", proto_k, v);
+            // on créé une liste de endpoints
+            // pe on doit match avant ?
+            for (endpoint_name,endpoint_value) in v.as_object().unwrap() {
+                  
+                println!("endpoint name {}: endpoint value{:?}", endpoint_name, endpoint_value);
+            }
+            // on append cette liste au bon protoendpoint
             match proto_k {
                 ProtocolName::Bitcoin => {
+
+                    
+                    // add key network value k to map v
+                    // let nv = v.
+
                     let endpoints = BitcoinEndpoints::deserialize(v).unwrap();
+                    println!("deserialized");
                     map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtoEndpoints::Bitcoin(endpoints));
+                    println!("END")
                 },
                 ProtocolName::Ethereum => {
                     let endpoints = EthereumEndpoints::deserialize(v).unwrap();
@@ -53,19 +70,6 @@ where
         }
     }
     Ok(map)
-}
-#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
-pub enum NetworkName {
-    #[serde(rename = "mainnet")]
-    Mainnet,
-    #[serde(rename = "testnet")]
-    Testnet,
-    #[serde(rename = "goerli")]
-    Goerli,
-    #[serde(rename = "sepolia")]
-    Sepolia,
-    #[serde(rename = "ghostnet")]
-    Ghostnet
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Global {
@@ -82,6 +86,20 @@ pub struct Metrics {
 pub struct Server {
     pub port: u32,
 }
+#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
+pub enum NetworkName {
+    #[serde(rename = "mainnet")]
+    Mainnet,
+    #[serde(rename = "testnet")]
+    Testnet,
+    #[serde(rename = "goerli")]
+    Goerli,
+    #[serde(rename = "sepolia")]
+    Sepolia,
+    #[serde(rename = "ghostnet")]
+    Ghostnet
+}
+
 
 #[derive(Serialize, Debug, Clone,Eq, Hash, PartialEq)]
 pub enum ProtocolName {
@@ -92,6 +110,7 @@ pub enum ProtocolName {
     #[serde(rename = "tezos")]
     Tezos,
 }
+
 impl std::fmt::Display for ProtocolName {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -118,19 +137,17 @@ impl<'de>Deserialize<'de> for ProtocolName {
     }
 }
 
-#[derive( Serialize,Deserialize, Debug, Clone,Eq, Hash, PartialEq)]
+#[derive( Serialize,Deserialize, Debug, Clone,)]
 pub enum ProtoEndpoints {
-
     Bitcoin(BitcoinEndpoints),
     Ethereum(EthereumEndpoints),
     Tezos(TezosEndpoints),
 }
 
-
-#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
-pub struct BitcoinEndpoints {
-    pub rpc: Option<Vec<Endpoint>>,
-    pub blockstream: Option<Endpoint>,
+#[derive(Deserialize, Serialize, Debug, Clone,)]
+pub struct BitcoinEndpoints { 
+    pub rpc: Option<Vec<BitcoinNode>>,
+    pub blockstream: Option<BlockstreamEndpoint>,
     pub blockcypher: Option<Endpoint>,
 }
 #[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
@@ -145,14 +162,6 @@ pub struct TezosEndpoints {
     pub tzstats: Option<Endpoint>,
     pub tzkt: Option<Endpoint>,
 }
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Network {
-    pub config: Option<EndpointOptions>,
-    pub rpc: Option<Vec<Endpoint>>,
-    pub blockstream: Option<Endpoint>,
-    pub blockcypher: Option<Endpoint>,
-}
 #[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
 pub struct Endpoint {
     pub url: String,
@@ -160,10 +169,36 @@ pub struct Endpoint {
 }
 #[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
 pub struct EndpointOptions {
+    pub url: Option<String>,
     pub retry: Option<u32>,
     pub delay: Option<u32>,
-    pub couldown: Option<u32>,
+    pub rate: Option<u32>,
 }
+
+impl EndpointOptions {
+    pub fn init(&mut self)-> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if self.url.is_none() {
+            return Err("url is required".into());
+        }
+        if self.retry.is_none() {
+            self.retry = Some(DEFAULT_ENDPOINT_RETRY);
+        }
+        if self.delay.is_none() {
+            self.delay = Some(DEFAULT_ENDPOINT_DELAY);
+        }
+        if self.rate.is_none() {
+            self.rate = Some(DEFAULT_ENDPOINT_REQUEST_RATE);
+        }
+        Ok(())
+    }
+}
+
+pub const DEFAULT_SERVER_PORT: u32 = 8080;
+pub const DEFAULT_METRICS_PORT: u16 = 8081;
+pub const DEFAULT_HEAD_LENGTH: u32 = 5;
+pub const DEFAULT_ENDPOINT_RETRY: u32 = 3;
+pub const DEFAULT_ENDPOINT_DELAY: u32 = 1;
+pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
 
 impl Configuration {
     pub fn new() -> Result<Self, ConfigError> {
@@ -171,12 +206,12 @@ impl Configuration {
         // TODO: config file should be overridable by cli args
         let builder = config::Config::builder()
             .add_source(File::with_name("config.yaml"))
-            .set_default("global.server.port", 8080)?
-            .set_default("global.metrics.port", 8081)?
-            .set_default("global.head_length", 5)?
-            .set_default("global.endpoints.retry", 3)?
-            .set_default("global.endpoints.delay", 1)?
-            .set_default("global.endpoints.couldown", 5)?
+            .set_default("global.server.port", DEFAULT_SERVER_PORT)?
+            .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
+            .set_default("global.head_length", DEFAULT_HEAD_LENGTH)?
+            .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
+            .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
+            .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
             .build()?;
         let r: Result<Configuration, ConfigError> = builder.try_deserialize();
         match r {
@@ -186,5 +221,8 @@ impl Configuration {
             }
             Err(e) => Err(e),
         }
+    }
+    pub fn get_global_endpoint_config(&self) -> &EndpointOptions {
+        &self.global.endpoints
     }
 }

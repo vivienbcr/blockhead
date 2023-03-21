@@ -9,8 +9,8 @@ global:
     retry: 3
     # Delay between every retry
     delay: 1
-    # Couldown between every scrapping task
-    couldown: 4
+    # Rate between every scrapping task
+    rate: 4
   server:
     # On wich port json rpc will be served
     port: 8080

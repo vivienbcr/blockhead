@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use super::client::ReqwestClient;
-use crate::prom::registry::track_status_code;
+use crate::{prom::registry::track_status_code, configuration};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonRpcResponse<T>{
     pub jsonrpc: String,
@@ -33,19 +33,23 @@ pub struct JsonRpcBody {
 }
 impl ReqwestClient {
     pub async fn rpc(&self, body: &JsonRpcBody, protocol : &str, network: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        for i in 0..self.config.retry {
+        let url = self.config.url.clone().unwrap().clone();
+        // if url.is_none() {
+        //     return Err("Error: rpc request, no url".into());
+        // }
+        for i in 0..self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY) {
             let response = self
             .client
-            .post(&self.config.base_url.clone())
+            .post(&url)
             .body(serde_json::to_string(&body).unwrap())
             .send()
             .await;
             if response.is_err() {
                 println!(
                     "Error: rpc request error, retrying in {} seconds, tries {} on {} ",
-                    self.config.hiddle.unwrap_or(1),
+                    self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config.retry
+                    self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
@@ -53,14 +57,14 @@ impl ReqwestClient {
             let response = response.unwrap();
             let status = response.status().as_u16();
             // TODO: in case of 429, we should implement exponential backoff
-            track_status_code(self.config.base_url.clone(), status, network, protocol);
+            track_status_code(&url, status, network, protocol);
             if status != 200 {
                 println!(
                     "Error: rpc status code {}, retrying in {} seconds, tries {} on {} ",
                     status,
-                    self.config.hiddle.unwrap_or(1),
+                    self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config.retry
+                    self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;

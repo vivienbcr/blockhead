@@ -42,7 +42,7 @@ pub async fn metrics_handler() -> Result<impl Reply, Rejection> {
     buffer.clear();
     Ok(res)
 }
-pub fn track_status_code(url: String, status_code: u16, protocol: &str, network: &str) {
+pub fn track_status_code(url: &str, status_code: u16, protocol: &str, network: &str) {
     let base_domain = url.split("/").next().unwrap();
     match status_code {
         500..=599 => metrics::HTTP_REQUEST_CODE_500
