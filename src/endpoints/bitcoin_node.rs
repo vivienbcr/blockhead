@@ -6,20 +6,28 @@ use crate::requests::rpc::{JsonRpcBody, JsonRpcParams, JsonRpcResponse};
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-
+use std::time::{SystemTime, UNIX_EPOCH};
 use super::Endpoint;
 
 const JSON_RPC_VER: &str = "2.0";
 #[derive(Deserialize, Serialize,Debug,Clone)]
 pub struct BitcoinNode {
     pub url: String,
+    // options is used to store configuration deserialize, it is redondant with reqwest
+    // alternative is to init reqwest at the deserialization step
     pub options: Option<EndpointOptions>,
     #[serde(skip)]
     pub reqwest: Option<ReqwestClient>,
+    #[serde(skip)]
+    pub network: String,
+    #[serde(skip)]
+    pub last_request: u64,
 }
 #[async_trait]
 impl Endpoint for BitcoinNode {
-    async fn init(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn init(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // Init reqwest client
+        // Endpoint scope options override global options
         let default_endpoint_opts = configuration::CONFIGURATION.get().unwrap().get_global_endpoint_config();
         let local_opts = self.options.clone().unwrap();
         let endpoint_opt = Some(EndpointOptions {
@@ -31,8 +39,14 @@ impl Endpoint for BitcoinNode {
         self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
         Ok(())
     }
+    /* Bitcoin Rpc work like this:
+    1. Get the best block hash
+    2. Get the block
+    3. Get the previous block hash
+    4. Repeat 2 and 3 until the number of blocks is reached
+    */
     async fn parse_top_blocks(
-        &self,
+        &mut self,
         network: &str,
         n_block: usize,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
@@ -71,19 +85,39 @@ impl Endpoint for BitcoinNode {
             return Err("Error: build blockchain is less than n_block".into());
         }
         blockchain.finalize();
+        self.set_last_request();
         Ok(blockchain)
+    }
+    fn available(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        let diff = now - self.last_request;
+        if diff < self.options.clone().unwrap().rate.unwrap() as u64 {
+            return false;
+        }
+        true
     }
 }
 
 impl BitcoinNode {
+    fn set_last_request(&mut self) {
+        self.last_request = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+    }
     pub fn new(
-        reqwest_config: EndpointOptions,
+        endpoint_options: EndpointOptions,
         network: String,
     ) -> BitcoinNode {
         BitcoinNode {
-            url: "http://localhost:8332".to_string(),
-            options: None,
-            reqwest: Some(ReqwestClient::new(reqwest_config))
+            url: endpoint_options.clone().url.unwrap(),
+            options: Some(endpoint_options.clone()),
+            reqwest: Some(ReqwestClient::new(endpoint_options.clone())),
+            network,
+            last_request: 0
         }
     }
     pub async fn get_blockchain_info(

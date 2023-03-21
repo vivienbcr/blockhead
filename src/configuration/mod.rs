@@ -38,25 +38,38 @@ where
                 "ghostnet" => NetworkName::Ghostnet,
                 _ => return Err(serde::de::Error::custom(format!("Unknown or unsupported network: {} for protocol {}", k, proto_k))),
             };
-            println!("{}: {:?}", proto_k, v);
-            // on créé une liste de endpoints
-            // pe on doit match avant ?
-            for (endpoint_name,endpoint_value) in v.as_object().unwrap() {
-                  
-                println!("endpoint name {}: endpoint value{:?}", endpoint_name, endpoint_value);
-            }
-            // on append cette liste au bon protoendpoint
+            // find option field in v
+            // if option field is present, init request client
+            // println!("v: {:?}", v);
+            // let enpoints_list : Vec<_> = v.as_object().unwrap().keys().collect();
+            // let mut rpc_endpoints: Vec<EndpointOptions> = Vec::new();
+            // for e in enpoints_list {
+            //     match e.as_str() {
+            //         "rpc" => {
+            //             println!("rpc");
+            //             let rpc_conf = v.as_object().unwrap().get("rpc").unwrap();
+            //             rpc_endpoints  = serde_json::from_value(rpc_conf.clone()).unwrap();
+            //             println!("rpc_conf: {:?}", rpc_conf);
+            //         }
+            //         _ =>{
+            //             println!("e: {:?}", e);
+            //         }
+            //     }
+            // }
+          
+            // it would be usefull to init request client here
             match proto_k {
                 ProtocolName::Bitcoin => {
-
-                    
-                    // add key network value k to map v
-                    // let nv = v.
-
                     let endpoints = BitcoinEndpoints::deserialize(v).unwrap();
-                    println!("deserialized");
+                    // if endpoints.rpc.is_some() {
+                    //     // set network value in endpoints.rpc
+                    //     endpoints.rpc.unwrap().network = k.clone();
+
+                    // }
+                    // println!("endpoints setp 1: {:?}", endpoints);
+                    // if endpoints.rpc.is_some() {
+
                     map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtoEndpoints::Bitcoin(endpoints));
-                    println!("END")
                 },
                 ProtocolName::Ethereum => {
                     let endpoints = EthereumEndpoints::deserialize(v).unwrap();
@@ -71,6 +84,7 @@ where
     }
     Ok(map)
 }
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Global {
     pub endpoints: EndpointOptions,
@@ -98,6 +112,17 @@ pub enum NetworkName {
     Sepolia,
     #[serde(rename = "ghostnet")]
     Ghostnet
+}
+impl NetworkName {
+    pub fn to_string(&self) -> String {
+        match self {
+            NetworkName::Mainnet => "mainnet".to_string(),
+            NetworkName::Testnet => "testnet".to_string(),
+            NetworkName::Goerli => "goerli".to_string(),
+            NetworkName::Sepolia => "sepolia".to_string(),
+            NetworkName::Ghostnet => "ghostnet".to_string(),
+        }
+    }
 }
 
 
@@ -137,19 +162,21 @@ impl<'de>Deserialize<'de> for ProtocolName {
     }
 }
 
-#[derive( Serialize,Deserialize, Debug, Clone,)]
+#[derive( Serialize,Deserialize, Debug, Clone)]
 pub enum ProtoEndpoints {
     Bitcoin(BitcoinEndpoints),
     Ethereum(EthereumEndpoints),
     Tezos(TezosEndpoints),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone,)]
+#[derive(Deserialize, Serialize, Debug,Clone)]
 pub struct BitcoinEndpoints { 
     pub rpc: Option<Vec<BitcoinNode>>,
     pub blockstream: Option<BlockstreamEndpoint>,
     pub blockcypher: Option<Endpoint>,
 }
+
+
 #[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
 pub struct EthereumEndpoints {
     pub rpc: Option<Vec<Endpoint>>,
@@ -175,23 +202,23 @@ pub struct EndpointOptions {
     pub rate: Option<u32>,
 }
 
-impl EndpointOptions {
-    pub fn init(&mut self)-> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if self.url.is_none() {
-            return Err("url is required".into());
-        }
-        if self.retry.is_none() {
-            self.retry = Some(DEFAULT_ENDPOINT_RETRY);
-        }
-        if self.delay.is_none() {
-            self.delay = Some(DEFAULT_ENDPOINT_DELAY);
-        }
-        if self.rate.is_none() {
-            self.rate = Some(DEFAULT_ENDPOINT_REQUEST_RATE);
-        }
-        Ok(())
-    }
-}
+// impl EndpointOptions {
+//     pub fn init(&mut self)-> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+//         if self.url.is_none() {
+//             return Err("url is required".into());
+//         }
+//         if self.retry.is_none() {
+//             self.retry = Some(DEFAULT_ENDPOINT_RETRY);
+//         }
+//         if self.delay.is_none() {
+//             self.delay = Some(DEFAULT_ENDPOINT_DELAY);
+//         }
+//         if self.rate.is_none() {
+//             self.rate = Some(DEFAULT_ENDPOINT_REQUEST_RATE);
+//         }
+//         Ok(())
+//     }
+// }
 
 pub const DEFAULT_SERVER_PORT: u32 = 8080;
 pub const DEFAULT_METRICS_PORT: u16 = 8081;
