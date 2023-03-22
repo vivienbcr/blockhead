@@ -26,17 +26,38 @@ pub struct BitcoinNode {
 #[async_trait]
 impl Endpoint for BitcoinNode {
     fn init(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        println!("Init BitcoinNode endpoint: {:?}", self);
         // Init reqwest client
         // Endpoint scope options override global options
         let default_endpoint_opts = configuration::CONFIGURATION.get().unwrap().get_global_endpoint_config();
-        let local_opts = self.options.clone().unwrap();
-        let endpoint_opt = Some(EndpointOptions {
-            url: Some(self.url.clone()),
-            retry: local_opts.retry.or(default_endpoint_opts.retry),
-            rate: local_opts.rate.or(default_endpoint_opts.rate),
-            delay : local_opts.delay.or(default_endpoint_opts.delay)
-        });
-        self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
+        match &self.options {
+            Some(opts) => {
+                let endpoint_opt = Some(EndpointOptions {
+                    url: Some(self.url.clone()),
+                    retry: opts.retry.or(default_endpoint_opts.retry),
+                    rate: opts.rate.or(default_endpoint_opts.rate),
+                    delay : opts.delay.or(default_endpoint_opts.delay)
+                });
+                self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
+            }
+            None => {
+                let endpoint_opt = Some(EndpointOptions {
+                    url: Some(self.url.clone()),
+                    retry: default_endpoint_opts.retry,
+                    rate: default_endpoint_opts.rate,
+                    delay : default_endpoint_opts.delay
+                });
+                self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
+            }
+        }
+        // let local_opts = self.options.clone().unwrap();
+        // let endpoint_opt = Some(EndpointOptions {
+        //     url: Some(self.url.clone()),
+        //     retry: local_opts.retry.or(default_endpoint_opts.retry),
+        //     rate: local_opts.rate.or(default_endpoint_opts.rate),
+        //     delay : local_opts.delay.or(default_endpoint_opts.delay)
+        // });
+        // self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
         Ok(())
     }
     /* Bitcoin Rpc work like this:
@@ -94,7 +115,8 @@ impl Endpoint for BitcoinNode {
             .expect("Time went backwards")
             .as_secs();
         let diff = now - self.last_request;
-        if diff < self.options.clone().unwrap().rate.unwrap() as u64 {
+        if diff < self.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
+            println!("Rate limit reached for {} ({}s)", self.url, diff);
             return false;
         }
         true
