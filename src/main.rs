@@ -1,4 +1,4 @@
-use warp::Filter;
+use warp::{Filter};
 pub mod prom;
 pub mod requests;
 pub mod commons;
@@ -7,21 +7,25 @@ pub mod collectors;
 pub mod endpoints;
 use crate::prom::registry::{metrics_handler, register_custom_metrics};
 // use crate::configuration;
+#[macro_use]
+extern crate log;
 
+use env_logger::Env;
 
 #[tokio::main]
 async fn main() {
+    let env = Env::default().default_filter_or("blockhead=debug");
+    env_logger::init_from_env(env);
     let config  =  match configuration::Configuration::new() {
         Ok(c) => {
-            println!("Configuration successfully loaded..");
+            info!("Configuration loaded successfully");
             c
         },
         Err(e) => {
-            println!("Error loading configuration: {}", e);
+            error!("Error loading configuration: {}", e);
             std::process::exit(1);
         }
     };
-    println!("\n\nConfiguration: {:?}\n\n", config);
     register_custom_metrics();
     
     let metrics_route = warp::path!("metrics").and_then(metrics_handler);
@@ -33,13 +37,12 @@ async fn main() {
         let map_networks = protocol.1.clone(); // mainnet, testnet, etc
         match &proto_name {
             configuration::ProtocolName::Bitcoin => {
-                println!("Spawning Bitcoin collector");
+                info!("Bitcoin endpoints detected... ");
                 map_networks.iter().for_each(|map_network| {
                     let network = map_network.0.clone();
                     let endpoints = map_network.1.clone(); // At this point, protoEndpoints is only BitcoinEndpoints
                     match &endpoints {
                         configuration::ProtoEndpoints::Bitcoin(endpoints) => {
-                            println!("Spawning collector for protocol: {:?}, network: {:?}, endpoints: {:?}", proto_name, network, endpoints);
                             tokio::task::spawn(collectors::bitcoin(network, endpoints.clone()));
                         },
                         _ => {}

@@ -26,7 +26,6 @@ pub struct BitcoinNode {
 #[async_trait]
 impl Endpoint for BitcoinNode {
     fn init(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        println!("Init BitcoinNode endpoint: {:?}", self);
         // Init reqwest client
         // Endpoint scope options override global options
         let default_endpoint_opts = configuration::CONFIGURATION.get().unwrap().get_global_endpoint_config();
@@ -50,14 +49,7 @@ impl Endpoint for BitcoinNode {
                 self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
             }
         }
-        // let local_opts = self.options.clone().unwrap();
-        // let endpoint_opt = Some(EndpointOptions {
-        //     url: Some(self.url.clone()),
-        //     retry: local_opts.retry.or(default_endpoint_opts.retry),
-        //     rate: local_opts.rate.or(default_endpoint_opts.rate),
-        //     delay : local_opts.delay.or(default_endpoint_opts.delay)
-        // });
-        // self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
+        debug!("Initialized Bitcoin Node endpoint: {:?}", self);
         Ok(())
     }
     /* Bitcoin Rpc work like this:
@@ -116,7 +108,7 @@ impl Endpoint for BitcoinNode {
             .as_secs();
         let diff = now - self.last_request;
         if diff < self.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
-            println!("Rate limit reached for {} ({}s)", self.url, diff);
+            debug!("Rate limit reached for {} ({}s)", self.url, diff);
             return false;
         }
         true
@@ -189,7 +181,7 @@ impl BitcoinNode {
             .rpc(
                 &body,
                 &configuration::ProtocolName::Bitcoin.to_string(),
-                &"FIXME NETWORK",
+                &self.network,
             )
             .await;
         if res.is_err() {

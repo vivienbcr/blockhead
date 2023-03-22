@@ -22,10 +22,16 @@ protocols:
     mainnet:
       rpc:
       - url: https://sample.bitcoin.mainnet.rpc
+        options:
+          retry: 10
+          delay: 1
+          rate: 1
       blockstream:
         url: https://sample.bitcoin.mainnet.blockstream.api
       blockcypher:
         url: https://sample.bitcoin.mainnet.blockcypher.api
+        options:
+          rate: 60
   ethereum:
     mainnet:
       rpc:

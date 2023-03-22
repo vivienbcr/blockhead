@@ -2,12 +2,13 @@ use std::{time::Duration, clone};
 
 use futures::future::join_all;
 
-use crate::{configuration::{ProtocolName, NetworkName, ProtoEndpoints, BitcoinEndpoints, self}, endpoints::{blockstream, bitcoin_node::{self, BitcoinNode}, Endpoint}};
+use crate::{configuration::{ProtocolName, NetworkName,  BitcoinEndpoints}, endpoints::{ Endpoint}};
 
 // pub mod bitcoin;
 
 
 pub async fn bitcoin( network_name : NetworkName, endpoints : BitcoinEndpoints ) {
+    info!("Spawning collector for protocol: {:?}, network: {:?}", ProtocolName::Bitcoin, network_name);
     let str_name = network_name.to_string();
 
     let mut rpcs = endpoints.rpc.unwrap();
@@ -21,7 +22,7 @@ pub async fn bitcoin( network_name : NetworkName, endpoints : BitcoinEndpoints )
         }).collect::<Vec<_>>();
 
         let results = join_all(futures_vec).await;
-        println!("Results: {:?}", results);
+        debug!("Results: {:?}", results);
 
     }
 }
