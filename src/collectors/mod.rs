@@ -1,11 +1,8 @@
-use std::{time::Duration, clone};
+use std::{time::Duration};
 
 use futures::future::join_all;
 
 use crate::{configuration::{ProtocolName, NetworkName,  BitcoinEndpoints}, endpoints::{ Endpoint}};
-
-// pub mod bitcoin;
-
 
 pub async fn bitcoin( network_name : NetworkName, endpoints : BitcoinEndpoints ) {
     info!("Spawning collector for protocol: {:?}, network: {:?}", ProtocolName::Bitcoin, network_name);

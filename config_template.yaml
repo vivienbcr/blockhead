@@ -26,6 +26,11 @@ protocols:
           retry: 10
           delay: 1
           rate: 1
+      - url: https://sample2.bitcoin.mainnet.rpc
+        options:
+          retry: 10
+          delay: 1
+          rate: 10
       blockstream:
         url: https://sample.bitcoin.mainnet.blockstream.api
       blockcypher:
