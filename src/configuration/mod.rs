@@ -5,7 +5,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Deserializer};
 use serde_json::Value;
 
-use crate::{endpoints::{bitcoin_node::BitcoinNode, blockstream::BlockstreamEndpoint}};
+use crate::{endpoints::{bitcoin_node::BitcoinNode, blockstream::Blockstream}};
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 
@@ -172,7 +172,7 @@ pub enum ProtoEndpoints {
 #[derive(Deserialize, Serialize, Debug,Clone)]
 pub struct BitcoinEndpoints { 
     pub rpc: Option<Vec<BitcoinNode>>,
-    pub blockstream: Option<BlockstreamEndpoint>,
+    pub blockstream: Option<Blockstream>,
     pub blockcypher: Option<Endpoint>,
 }
 
@@ -201,24 +201,6 @@ pub struct EndpointOptions {
     pub delay: Option<u32>,
     pub rate: Option<u32>,
 }
-
-// impl EndpointOptions {
-//     pub fn init(&mut self)-> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-//         if self.url.is_none() {
-//             return Err("url is required".into());
-//         }
-//         if self.retry.is_none() {
-//             self.retry = Some(DEFAULT_ENDPOINT_RETRY);
-//         }
-//         if self.delay.is_none() {
-//             self.delay = Some(DEFAULT_ENDPOINT_DELAY);
-//         }
-//         if self.rate.is_none() {
-//             self.rate = Some(DEFAULT_ENDPOINT_REQUEST_RATE);
-//         }
-//         Ok(())
-//     }
-// }
 
 pub const DEFAULT_SERVER_PORT: u32 = 8080;
 pub const DEFAULT_METRICS_PORT: u16 = 8081;

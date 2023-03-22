@@ -61,7 +61,7 @@ impl Endpoint for BitcoinNode {
     async fn parse_top_blocks(
         &mut self,
         network: &str,
-        n_block: usize,
+        n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
             &configuration::ProtocolName::Bitcoin.to_string(),
@@ -94,10 +94,10 @@ impl Endpoint for BitcoinNode {
                 }
             }
         }
-        if blockchain.blocks.len() < n_block {
+        if blockchain.blocks.len() < n_block as usize {
             return Err("Error: build blockchain is less than n_block".into());
         }
-        blockchain.finalize();
+        blockchain.sort();
         self.set_last_request();
         Ok(blockchain)
     }
@@ -116,13 +116,6 @@ impl Endpoint for BitcoinNode {
 }
 
 impl BitcoinNode {
-    fn set_last_request(&mut self) {
-        trace!("Set last request for {} to {}", self.url, self.last_request);
-        self.last_request = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-    }
     pub fn new(
         endpoint_options: EndpointOptions,
         network: String,
@@ -134,6 +127,13 @@ impl BitcoinNode {
             network,
             last_request: 0
         }
+    }
+    fn set_last_request(&mut self) {
+        trace!("Set last request for {} to {}", self.url, self.last_request);
+        self.last_request = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
     }
     pub async fn get_blockchain_info(
         &self,

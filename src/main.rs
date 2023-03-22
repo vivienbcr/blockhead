@@ -30,7 +30,8 @@ async fn main() {
     
     let metrics_route = warp::path!("metrics").and_then(metrics_handler);
     
-    
+    // std::process::exit(1);
+
     // for each protocol in config, for each network in protocol, spawn a collector
     config.protocols.iter().for_each(|protocol| {
         let proto_name = protocol.0.clone(); // Bitcoin, Ethereum, etc

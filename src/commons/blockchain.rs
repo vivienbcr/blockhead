@@ -30,8 +30,12 @@ impl Blockchain {
         }
         self.blocks.push(block);
     }
-    pub fn finalize(&mut self) {
+    pub fn sort(&mut self) {
         self.blocks.sort_by(|a, b| a.height.cmp(&b.height));
+        if self.blocks.len() > 0 {
+            self.height = self.blocks.last().unwrap().height;
+        }
+        // FIXME : Remove me 
         prom::registry::set_blockchain_metrics(
             &self.protocol,
             &self.network,
