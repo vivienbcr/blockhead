@@ -117,6 +117,7 @@ impl Endpoint for BitcoinNode {
 
 impl BitcoinNode {
     fn set_last_request(&mut self) {
+        trace!("Set last request for {} to {}", self.url, self.last_request);
         self.last_request = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -137,6 +138,7 @@ impl BitcoinNode {
     pub async fn get_blockchain_info(
         &self,
     ) -> Result<Getblockchaininfo, Box<dyn std::error::Error + Send + Sync>> {
+        trace!("Get blockchain info for {}", self.url);
         let body = JsonRpcBody {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
@@ -148,6 +150,7 @@ impl BitcoinNode {
     pub async fn get_best_block_hash(
         &self,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        trace!("Get best block hash for {}", self.url);
         let body = JsonRpcBody {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
@@ -160,6 +163,7 @@ impl BitcoinNode {
         &self,
         hash: &str,
     ) -> Result<Getblock, Box<dyn std::error::Error + Send + Sync>> {
+        trace!("Get block for {}", self.url);
         let body = JsonRpcBody {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
@@ -176,6 +180,7 @@ impl BitcoinNode {
         &self,
         body: &JsonRpcBody,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
+        trace!("Run for {}", self.url);
         let reqwest = self.reqwest.as_ref().unwrap();
         let res = reqwest
             .rpc(
