@@ -8,7 +8,7 @@ RUN apt update && apt install -y musl-tools musl-dev libssl-dev pkg-config
 RUN update-ca-certificates
 
 # Create appuser
-ENV USER=injector
+ENV USER=blockhead
 ENV UID=10001
 ENV PKG_CONFIG_SYSROOT_DIR=/
 
@@ -22,7 +22,7 @@ RUN adduser \
     "${USER}"
 
 
-WORKDIR /injector
+WORKDIR /blockhead
 
 COPY ./ .
 
@@ -37,12 +37,12 @@ FROM scratch
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 
-WORKDIR /injector
+WORKDIR /blockhead
 
 # Copy our build
-COPY --from=builder /injector/target/x86_64-unknown-linux-musl/release/injector ./
+COPY --from=builder /blockhead/target/x86_64-unknown-linux-musl/release/blockhead ./
 
 # Use an unprivileged user.
-USER injector:injector
+USER blockhead:blockhead
 
-CMD ["/injector/injector"]
+CMD ["/blockhead/blockhead"]
