@@ -54,7 +54,7 @@ impl ReqwestClient {
             let response = response.unwrap();
             let status = response.status().as_u16();
             // TODO: in case of 429, we should implement exponential backoff
-            track_status_code(&url, status, network, protocol);
+            track_status_code(&url, "POST",status, protocol, network );
             if status != 200 {
                 debug!(
                     "Error: RPC {} status code {}, retrying in {} seconds, tries {} on {} ",
@@ -89,7 +89,7 @@ impl ReqwestClient {
             }
             let response = response.unwrap();
             let status = response.status().as_u16();
-            track_status_code(&url, status, network, protocol);
+            track_status_code(&url, "GET",status, protocol, network);
             if status != 200 {
                 println!(
                     "Error: GET {} status code {}, retrying in {} seconds, tries {} on {} ",

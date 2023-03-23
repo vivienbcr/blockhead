@@ -19,11 +19,11 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
     let str_name = network_name.to_string();
 
     let mut rpcs = endpoints.rpc.unwrap_or(Vec::new());
-    rpcs.iter_mut().for_each(|r| r.init().unwrap());
+    rpcs.iter_mut().for_each(|r| r.init(&str_name).unwrap());
 
     let mut blockstream = match endpoints.blockstream {
         Some(mut b) => {
-            b.init().unwrap();
+            b.init(&str_name).unwrap();
             Some(b)
         }
         None => None,
@@ -41,7 +41,7 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
                 rpcs.iter_mut()
                     .filter(|r| r.available())
                     .map(|r| {
-                        return r.parse_top_blocks(&str_name, head_len);
+                        return r.parse_top_blocks( head_len);
                     })
                     .collect::<Vec<_>>(),
             );
@@ -49,7 +49,7 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
         match &mut blockstream {
             Some(b) => {
                 if b.available() {
-                    futures_vec.push(b.parse_top_blocks(&str_name, head_len));
+                    futures_vec.push(b.parse_top_blocks( head_len));
                 }
             }
             None => {}

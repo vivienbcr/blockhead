@@ -20,7 +20,7 @@ pub struct Blockstream {
 }
 #[async_trait]
 impl Endpoint for Blockstream {
-    fn init(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
+    fn init(&mut self, network: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
         // Init reqwest client
         // Endpoint scope options override global options
         let default_endpoint_opts = configuration::CONFIGURATION.get().unwrap().get_global_endpoint_config();
@@ -44,17 +44,17 @@ impl Endpoint for Blockstream {
                 self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
             }
         }
+        self.network = network.to_string();
         debug!("Initialized Blockstream endpoint: {:?}", self);
         Ok(())
     }
     async fn parse_top_blocks(
         &mut self,
-        network: &str,
          nb_blocks: u32
         ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
                 &configuration::ProtocolName::Bitcoin.to_string(),
-                network,
+                &self.network,
             );
         let mut height = self.get_chain_height().await?;
         let mut blocks = self.get_blocks_from_height(height).await?;

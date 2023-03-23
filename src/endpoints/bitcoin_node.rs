@@ -25,7 +25,7 @@ pub struct BitcoinNode {
 }
 #[async_trait]
 impl Endpoint for BitcoinNode {
-    fn init(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn init(&mut self, network: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Init reqwest client
         // Endpoint scope options override global options
         let default_endpoint_opts = configuration::CONFIGURATION.get().unwrap().get_global_endpoint_config();
@@ -49,6 +49,7 @@ impl Endpoint for BitcoinNode {
                 self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
             }
         }
+        self.network = network.to_string();
         debug!("Initialized Bitcoin Node endpoint: {:?}", self);
         Ok(())
     }
@@ -60,12 +61,11 @@ impl Endpoint for BitcoinNode {
     */
     async fn parse_top_blocks(
         &mut self,
-        network: &str,
         n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
             &configuration::ProtocolName::Bitcoin.to_string(),
-            network,
+            &self.network,
         );
         let bbh_res = self.get_best_block_hash().await;
         let best_block_hash = match bbh_res {

@@ -8,7 +8,7 @@ pub static HTTP_REQUEST_CODE_200: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "http_request_code_200",
         "http request returns code 200",
-        &["base_url", "proto", "network"]
+        &["base_url","method", "proto", "network"]
     )
     .expect("metric can be created")
 });
@@ -16,7 +16,7 @@ pub static HTTP_REQUEST_CODE_400: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "http_request_code_400",
         "http request returns code 400",
-        &["base_url", "proto", "network"]
+        &["base_url","method", "proto", "network"]
     )
     .expect("metric can be created")
 });
@@ -24,7 +24,7 @@ pub static HTTP_REQUEST_CODE_500: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "http_request_code_500",
         "http request returns code 500",
-        &["base_url", "proto", "network"]
+        &["base_url","method", "proto", "network"]
     )
     .expect("metric can be created")
 });

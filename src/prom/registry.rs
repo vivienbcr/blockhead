@@ -42,17 +42,24 @@ pub async fn metrics_handler() -> Result<impl Reply, Rejection> {
     buffer.clear();
     Ok(res)
 }
-pub fn track_status_code(url: &str, status_code: u16, protocol: &str, network: &str) {
-    let base_domain = url.split("/").next().unwrap();
+pub fn track_status_code(url: &str,method : &str, status_code: u16, protocol: &str, network: &str) {
+   // retain only https://domain.tld
+    let base_domain = url
+        .split('/')
+        .nth(2)
+        .unwrap_or("unknown")
+        .split(':')
+        .nth(0)
+        .unwrap_or("unknown");
     match status_code {
         500..=599 => metrics::HTTP_REQUEST_CODE_500
-            .with_label_values(&[base_domain, protocol, network])
+            .with_label_values(&[base_domain,method, protocol, network])
             .inc(),
         400..=499 => metrics::HTTP_REQUEST_CODE_400
-            .with_label_values(&[base_domain, protocol, network])
+            .with_label_values(&[base_domain,method, protocol, network])
             .inc(),
         200..=299 => metrics::HTTP_REQUEST_CODE_200
-            .with_label_values(&[base_domain, protocol, network])
+            .with_label_values(&[base_domain,method, protocol, network])
             .inc(),
         _ => (),
     };
