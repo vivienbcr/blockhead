@@ -4,11 +4,11 @@ use futures::{future::join_all, Future};
 
 use crate::{
     commons::blockchain::{Blockchain, self},
-    configuration::{BitcoinEndpoints, NetworkName, ProtocolName, NetworkOptions},
+    configuration::{BitcoinOpts, NetworkName, ProtocolName, NetworkOptions},
     endpoints::Endpoint, prom,
 };
 
-pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
+pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinOpts) {
     info!(
         "Spawning collector for protocol: {:?}, network: {:?}",
         ProtocolName::Bitcoin,

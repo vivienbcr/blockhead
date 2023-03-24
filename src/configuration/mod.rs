@@ -13,9 +13,9 @@ pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 pub struct Configuration {
     pub global: Global,
     #[serde(deserialize_with = "deserialize_protocols")]
-    pub protocols: HashMap<ProtocolName,HashMap<NetworkName,ProtoEndpoints>>,
+    pub protocols: HashMap<ProtocolName,HashMap<NetworkName,ProtocolsOpts>>,
 }
-fn deserialize_protocols<'de, D>(deserializer: D) -> Result<HashMap<ProtocolName, HashMap<NetworkName,ProtoEndpoints>>, D::Error>
+fn deserialize_protocols<'de, D>(deserializer: D) -> Result<HashMap<ProtocolName, HashMap<NetworkName,ProtocolsOpts>>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -60,7 +60,7 @@ where
             // it would be usefull to init request client here
             match proto_k {
                 ProtocolName::Bitcoin => {
-                    let endpoints = BitcoinEndpoints::deserialize(v).unwrap();
+                    let endpoints = BitcoinOpts::deserialize(v).unwrap();
                     println!("endpoints setp 0: {:?}", endpoints);
                     // if endpoints.rpc.is_some() {
                     //     // set network value in endpoints.rpc
@@ -70,15 +70,15 @@ where
                     // println!("endpoints setp 1: {:?}", endpoints);
                     // if endpoints.rpc.is_some() {
 
-                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtoEndpoints::Bitcoin(endpoints));
+                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtocolsOpts::Bitcoin(endpoints));
                 },
                 ProtocolName::Ethereum => {
                     let endpoints = EthereumEndpoints::deserialize(v).unwrap();
-                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtoEndpoints::Ethereum(endpoints));
+                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtocolsOpts::Ethereum(endpoints));
                 },
                 ProtocolName::Tezos => {
                     let endpoints = TezosEndpoints::deserialize(v).unwrap();
-                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtoEndpoints::Tezos(endpoints));
+                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtocolsOpts::Tezos(endpoints));
                 },
             }
         }
@@ -165,8 +165,8 @@ impl<'de>Deserialize<'de> for ProtocolName {
 }
 
 #[derive( Serialize,Deserialize, Debug, Clone)]
-pub enum ProtoEndpoints {
-    Bitcoin(BitcoinEndpoints),
+pub enum ProtocolsOpts {
+    Bitcoin(BitcoinOpts),
     Ethereum(EthereumEndpoints),
     Tezos(TezosEndpoints),
 }
@@ -191,7 +191,7 @@ impl NetworkOptions {
 }
 
 #[derive(Deserialize, Serialize, Debug,Clone)]
-pub struct BitcoinEndpoints { 
+pub struct BitcoinOpts { 
     pub network_options: Option<NetworkOptions>,
     pub rpc: Option<Vec<BitcoinNode>>,
     pub blockstream: Option<Blockstream>,

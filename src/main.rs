@@ -41,9 +41,9 @@ async fn main() {
                 info!("Bitcoin endpoints detected... ");
                 map_networks.iter().for_each(|map_network| {
                     let network = map_network.0.clone();
-                    let endpoints = map_network.1.clone(); // At this point, protoEndpoints is only BitcoinEndpoints
+                    let endpoints = map_network.1.clone(); // At this point, ProtocolsOpts is only BitcoinOpts
                     match &endpoints {
-                        configuration::ProtoEndpoints::Bitcoin(endpoints) => {
+                        configuration::ProtocolsOpts::Bitcoin(endpoints) => {
                             tokio::task::spawn(collectors::bitcoin(network, endpoints.clone()));
                         },
                         _ => {}
