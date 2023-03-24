@@ -54,7 +54,7 @@ async fn main() {
                 })
             },
             configuration::ProtocolName::Ethereum => {
-                println!("Ethereum collector not implemented yet");
+                info!("Ethereum collector not implemented yet");
             },
             _ => {}
 

@@ -77,7 +77,7 @@ impl ReqwestClient {
         for i in 0..self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY) {
             let response = self.client.get(&url).send().await;
             if response.is_err() {
-                println!(
+                debug!(
                     "Error: GET {} request error, retrying in {} seconds, tries {} on {} ",
                     url,
                     self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
@@ -91,7 +91,7 @@ impl ReqwestClient {
             let status = response.status().as_u16();
             track_status_code(&url, "GET",status, protocol, network);
             if status != 200 {
-                println!(
+                debug!(
                     "Error: GET {} status code {}, retrying in {} seconds, tries {} on {} ",
                     url,
                     status,

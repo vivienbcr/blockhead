@@ -3,9 +3,9 @@ use std::{error::Error, pin::Pin, time::Duration};
 use futures::{future::join_all, Future};
 
 use crate::{
-    commons::blockchain::Blockchain,
-    configuration::{BitcoinEndpoints, NetworkName, ProtocolName},
-    endpoints::Endpoint,
+    commons::blockchain::{Blockchain, self},
+    configuration::{BitcoinEndpoints, NetworkName, ProtocolName, NetworkOptions},
+    endpoints::Endpoint, prom,
 };
 
 pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
@@ -14,8 +14,14 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
         ProtocolName::Bitcoin,
         network_name
     );
-    let config = crate::configuration::CONFIGURATION.get().unwrap();
-    let head_len = config.global.head_length;
+    let network_opts = match endpoints.network_options{
+        Some(mut n) => {
+            n.init();
+            n
+        },
+        None => NetworkOptions::default()
+    };
+
     let str_name = network_name.to_string();
 
     let mut rpcs = endpoints.rpc.unwrap_or(Vec::new());
@@ -35,13 +41,12 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
         let mut futures_vec: Vec<
             Pin<Box<dyn Future<Output = Result<Blockchain, Box<dyn Error + Send + Sync>>> + Send>>,
         > = Vec::new();
-        // let mut futures_vec: Vec<Pin<Box<dyn Future<Output = Result<Blockchain, Box<dyn Error + Send + Sync>>> + Send>>> = Vec::new();
         if rpcs.len() != 0 {
             futures_vec.extend(
                 rpcs.iter_mut()
                     .filter(|r| r.available())
                     .map(|r| {
-                        return r.parse_top_blocks( head_len);
+                        return r.parse_top_blocks( network_opts.head_length.unwrap());
                     })
                     .collect::<Vec<_>>(),
             );
@@ -49,22 +54,33 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinEndpoints) {
         match &mut blockstream {
             Some(b) => {
                 if b.available() {
-                    futures_vec.push(b.parse_top_blocks( head_len));
+                    futures_vec.push(b.parse_top_blocks( network_opts.head_length.unwrap()));
                 }
             }
             None => {}
         }
 
-
-        // if blockstream.is_some() && blockstream.as_ref().unwrap().available() {
-        //     // let blockstream = blockstream.as_mut().unwrap();
-        //     if blockstream.unwrap().available() {
-        //         futures_vec.push(blockstream.unwrap().parse_top_blocks(&str_name, head_len));
-        //     }
-        // }
-
         let results = join_all(futures_vec).await;
-        debug!("Results: {:?}", results);
-        //TODO: Current blockchain finalization is not correct, it should be here after compare all blockchains returns by endpoints
+        let results = results
+            .into_iter()
+            .filter_map(|r| match r {
+                Ok(b) => Some(b),
+                Err(_) => None
+            })
+            .collect::<Vec<_>>();
+        if results.len() == 0 {
+            error!("Bitcoin collector: no results from endpoints for network: {:?}", network_name);
+            continue;
+        }
+        let mut best_chain = blockchain::get_highest_blockchain(results).unwrap();
+        best_chain.sort();
+        debug!("best_chain: {:?}", best_chain);
+        prom::registry::set_blockchain_metrics(
+            &best_chain.protocol,
+            &best_chain.network,
+            best_chain.height as i64,
+            best_chain.blocks.last().unwrap().time as i64,
+            best_chain.blocks.last().unwrap().txs as i64,
+        );
     }
 }

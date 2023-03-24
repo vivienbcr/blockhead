@@ -19,7 +19,7 @@ fn deserialize_protocols<'de, D>(deserializer: D) -> Result<HashMap<ProtocolName
 where
     D: Deserializer<'de>,
 {
-    println!("deserialize_protocols");
+    debug!("deserialize_protocols");
     let v: Value = Deserialize::deserialize(deserializer)?;
     let mut map = HashMap::new();
     for (proto_k, v) in v.as_object().unwrap() {
@@ -61,6 +61,7 @@ where
             match proto_k {
                 ProtocolName::Bitcoin => {
                     let endpoints = BitcoinEndpoints::deserialize(v).unwrap();
+                    println!("endpoints setp 0: {:?}", endpoints);
                     // if endpoints.rpc.is_some() {
                     //     // set network value in endpoints.rpc
                     //     endpoints.rpc.unwrap().network = k.clone();
@@ -90,7 +91,8 @@ pub struct Global {
     pub endpoints: EndpointOptions,
     pub metrics: Metrics,
     pub server: Server,
-    pub head_length: u32,
+    pub networks_options: NetworkOptions,
+    // pub head_length: u32,
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Metrics {
@@ -152,7 +154,7 @@ impl<'de>Deserialize<'de> for ProtocolName {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        println!("s: {:?}", s);
+        debug!("s: {:?}", s);
         match s.as_str() {
             "bitcoin" => Ok(ProtocolName::Bitcoin),
             "ethereum" => Ok(ProtocolName::Ethereum),
@@ -169,8 +171,28 @@ pub enum ProtoEndpoints {
     Tezos(TezosEndpoints),
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct NetworkOptions {
+    pub head_length: Option<u32>,
+}
+impl NetworkOptions {
+    pub fn init(&mut self){
+        let global_config = CONFIGURATION.get().unwrap();
+        let global_networks_options = global_config.global.networks_options.clone();
+        if self.head_length.is_none() {
+            self.head_length = global_networks_options.head_length;
+        }
+    }
+    pub fn default() -> Self {
+        NetworkOptions {
+            head_length: Some(DEFAULT_HEAD_LENGTH),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug,Clone)]
 pub struct BitcoinEndpoints { 
+    pub network_options: Option<NetworkOptions>,
     pub rpc: Option<Vec<BitcoinNode>>,
     pub blockstream: Option<Blockstream>,
     pub blockcypher: Option<Endpoint>,
@@ -214,13 +236,13 @@ impl Configuration {
         // TODO: config file should be overridable by env variables
         // TODO: config file should be overridable by cli args
         let builder = config::Config::builder()
+        .set_default("global.server.port", DEFAULT_SERVER_PORT)?
+        .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
+        .set_default("global.networks_options.head_length", DEFAULT_HEAD_LENGTH)?
+        .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
+        .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
+        .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
             .add_source(File::with_name("config.yaml"))
-            .set_default("global.server.port", DEFAULT_SERVER_PORT)?
-            .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
-            .set_default("global.head_length", DEFAULT_HEAD_LENGTH)?
-            .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
-            .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
-            .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
             .build()?;
         let r: Result<Configuration, ConfigError> = builder.try_deserialize();
         match r {

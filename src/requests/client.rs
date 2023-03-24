@@ -17,8 +17,8 @@ impl ReqwestClient {
     }
     pub async fn iddle(&self) {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            match self.config.rate {
-                Some(rate) => rate as u64,
+            match self.config.delay {
+                Some(delay) => delay as u64,
                 None => 1,
             }
         ))

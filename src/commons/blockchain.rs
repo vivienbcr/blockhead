@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 use crate::prom;
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug,Clone)]
 pub struct Block {
     pub hash: String,
     pub height: u64,
     pub time: u64,
     pub txs: u64,
 }
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug,Clone)]
 pub struct Blockchain {
     pub blocks: Vec<Block>,
     pub height: u64,
@@ -30,18 +30,25 @@ impl Blockchain {
         }
         self.blocks.push(block);
     }
-    pub fn sort(&mut self) {
+    pub fn sort(&mut self){
         self.blocks.sort_by(|a, b| a.height.cmp(&b.height));
         if self.blocks.len() > 0 {
             self.height = self.blocks.last().unwrap().height;
         }
-        // FIXME : Remove me 
-        prom::registry::set_blockchain_metrics(
-            &self.protocol,
-            &self.network,
-            self.height as i64,
-            self.blocks.last().unwrap().time as i64,
-            self.blocks.last().unwrap().txs as i64,
-        );
+
+    }
+}
+
+pub fn get_highest_blockchain(blockchains: Vec<Blockchain>) -> Option<Blockchain> {
+    match blockchains.len() {
+        0 => None,
+        _ => Some(
+            blockchains
+                .iter()
+                .filter(|b| b.height > 0)
+                .max_by(|a, b| a.height.cmp(&b.height))
+                .unwrap()
+                .clone(),
+        ),
     }
 }

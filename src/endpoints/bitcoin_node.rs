@@ -71,7 +71,7 @@ impl Endpoint for BitcoinNode {
         let best_block_hash = match bbh_res {
             Ok(hash) => hash,
             Err(e) => {
-                println!("Error: {}", e);
+                trace!("Error: {}", e);
                 return Err(e);
             }
         };
@@ -89,7 +89,7 @@ impl Endpoint for BitcoinNode {
                     });
                 }
                 Err(e) => {
-                    println!("Error: {}", e);
+                    trace!("Error: {}", e);
                     break;
                 }
             }
