@@ -31,7 +31,7 @@ impl Blockchain {
         self.blocks.push(block);
     }
     pub fn sort(&mut self){
-        self.blocks.sort_by(|a, b| a.height.cmp(&b.height));
+        self.blocks.sort_by(|a, b| b.height.cmp(&a.height));
         if self.blocks.len() > 0 {
             self.height = self.blocks.last().unwrap().height;
         }

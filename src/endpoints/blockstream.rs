@@ -60,13 +60,17 @@ impl Endpoint for Blockstream {
         let mut blocks = self.get_blocks_from_height(height).await?;
         while blocks.len() > 0 && blockchain.blocks.len() < nb_blocks as usize {
             for block in blocks {
-                blockchain.blocks.push(blockchain::Block { hash: block.id, height: block.height, time: block.mediantime, txs: block.tx_count });
+                blockchain.blocks.push(blockchain::Block { hash: block.id, height: block.height, time: block.timestamp, txs: block.tx_count });
             }
             height = height - 10;
             blocks = self.get_blocks_from_height(height).await?;
         }
         self.set_last_request();
         blockchain.sort();
+        // remove blocks to return vec len = nb_blocks
+        if blockchain.blocks.len() > nb_blocks as usize {
+            blockchain.blocks.truncate(nb_blocks as usize);
+        }
         Ok(blockchain)
 
     }
