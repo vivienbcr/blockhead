@@ -12,9 +12,9 @@ use super::Endpoint;
 const JSON_RPC_VER: &str = "2.0";
 #[derive(Deserialize, Serialize,Debug,Clone)]
 pub struct BitcoinNode {
-    pub url: String,
-    // options is used to store configuration deserialize, it is redondant with reqwest
+    // FIXME : Options && URL are used to store configuration deserialize, it is redondant with reqwest config
     // alternative is to init reqwest at the deserialization step
+    pub url: String,
     pub options: Option<EndpointOptions>,
     #[serde(skip)]
     pub reqwest: Option<ReqwestClient>,
@@ -26,31 +26,13 @@ pub struct BitcoinNode {
 #[async_trait]
 impl Endpoint for BitcoinNode {
     fn init(&mut self, network: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let mut self_options = self.options.clone().unwrap_or_default();
+        self_options.init(Some(&self.url));
+        self.options= Some(self_options);
         // Init reqwest client
-        // Endpoint scope options override global options
-        let default_endpoint_opts = configuration::CONFIGURATION.get().unwrap().get_global_endpoint_config();
-        match &self.options {
-            Some(opts) => {
-                let endpoint_opt = Some(EndpointOptions {
-                    url: Some(self.url.clone()),
-                    retry: opts.retry.or(default_endpoint_opts.retry),
-                    rate: opts.rate.or(default_endpoint_opts.rate),
-                    delay : opts.delay.or(default_endpoint_opts.delay)
-                });
-                self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
-            }
-            None => {
-                let endpoint_opt = Some(EndpointOptions {
-                    url: Some(self.url.clone()),
-                    retry: default_endpoint_opts.retry,
-                    rate: default_endpoint_opts.rate,
-                    delay : default_endpoint_opts.delay
-                });
-                self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
-            }
-        }
+        self.reqwest = Some(ReqwestClient::new(self.options.clone().unwrap()));
         self.network = network.to_string();
-        debug!("Initialized Bitcoin Node endpoint: {:?}", self);
+        info!("Initialized Bitcoin Node endpoint: {:?}", self.url);
         Ok(())
     }
     /* Bitcoin Rpc work like this:

@@ -199,29 +199,57 @@ pub struct BitcoinOpts {
 }
 
 
-#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct EthereumEndpoints {
     pub rpc: Option<Vec<Endpoint>>,
     pub infura: Option<Endpoint>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct TezosEndpoints {
     pub rpc: Option<Vec<Endpoint>>,
     pub tzstats: Option<Endpoint>,
     pub tzkt: Option<Endpoint>,
 }
-#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Endpoint {
     pub url: String,
     pub options: Option<EndpointOptions>,
 }
-#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct EndpointOptions {
     pub url: Option<String>,
     pub retry: Option<u32>,
     pub delay: Option<u32>,
     pub rate: Option<u32>,
+}
+impl EndpointOptions {
+    pub fn init(&mut self, url : Option<&str>){
+        if url.is_some() {
+            self.url = Some(url.unwrap().to_string());
+        }
+        let global_endpoint_conf = CONFIGURATION.get().unwrap().global.endpoints.clone();
+        if self.retry.is_none() {
+            self.retry = global_endpoint_conf.retry;
+        }
+        if self.delay.is_none() {
+            self.delay = global_endpoint_conf.delay;
+        }
+        if self.rate.is_none() {
+            self.rate = global_endpoint_conf.rate;
+        }
+    }
+}
+impl Default for EndpointOptions {
+    fn default() -> Self {
+        let global_endpoint_conf = CONFIGURATION.get().unwrap().global.endpoints.clone();
+        EndpointOptions {
+            url: None,
+            retry: global_endpoint_conf.retry,
+            delay: global_endpoint_conf.delay, 
+            rate:  global_endpoint_conf.rate,
+        } 
+    }
 }
 
 pub const DEFAULT_SERVER_PORT: u32 = 8080;

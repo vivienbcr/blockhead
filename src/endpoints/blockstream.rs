@@ -21,29 +21,11 @@ pub struct Blockstream {
 #[async_trait]
 impl Endpoint for Blockstream {
     fn init(&mut self, network: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
+        let mut self_options = self.options.clone().unwrap_or_default();
+        self_options.init(Some(&self.url));
+        self.options= Some(self_options);
         // Init reqwest client
-        // Endpoint scope options override global options
-        let default_endpoint_opts = configuration::CONFIGURATION.get().unwrap().get_global_endpoint_config();
-        match &self.options {
-            Some(opts) => {
-                let endpoint_opt = Some(EndpointOptions {
-                    url: Some(self.url.clone()),
-                    retry: opts.retry.or(default_endpoint_opts.retry),
-                    rate: opts.rate.or(default_endpoint_opts.rate),
-                    delay : opts.delay.or(default_endpoint_opts.delay)
-                });
-                self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
-            }
-            None => {
-                let endpoint_opt = Some(EndpointOptions {
-                    url: Some(self.url.clone()),
-                    retry: default_endpoint_opts.retry,
-                    rate: default_endpoint_opts.rate,
-                    delay : default_endpoint_opts.delay
-                });
-                self.reqwest = Some(ReqwestClient::new(endpoint_opt.clone().unwrap()));
-            }
-        }
+        self.reqwest = Some(ReqwestClient::new(self.options.clone().unwrap()));
         self.network = network.to_string();
         debug!("Initialized Blockstream endpoint: {:?}", self);
         Ok(())
