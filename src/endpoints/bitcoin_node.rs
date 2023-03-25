@@ -1,7 +1,5 @@
 use crate::commons::blockchain;
-use crate::configuration::{self, EndpointOptions, NetworkName};
-// use crate::configuration::Endpoint;
-use crate::requests::client::{ReqwestClient};
+use crate::configuration::{self};
 use crate::requests::rpc::{JsonRpcBody, JsonRpcParams, JsonRpcResponse};
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
@@ -12,29 +10,17 @@ use super::Endpoint;
 const JSON_RPC_VER: &str = "2.0";
 #[derive(Deserialize, Serialize,Debug,Clone)]
 pub struct BitcoinNode {
-    // FIXME : Options && URL are used to store configuration deserialize, it is redondant with reqwest config
-    // alternative is to init reqwest at the deserialization step
-    pub url: String,
-    pub options: Option<EndpointOptions>,
-    #[serde(skip)]
-    pub reqwest: Option<ReqwestClient>,
-    #[serde(skip)]
-    pub network: String,
-    #[serde(skip)]
-    pub last_request: u64,
+    endpoint: configuration::Endpoint,
+}
+impl BitcoinNode {
+    pub fn new (endpoint: configuration::Endpoint) -> BitcoinNode {
+        BitcoinNode {
+            endpoint
+        }
+    }
 }
 #[async_trait]
 impl Endpoint for BitcoinNode {
-    fn init(&mut self, network: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut self_options = self.options.clone().unwrap_or_default();
-        self_options.init(Some(&self.url));
-        self.options= Some(self_options);
-        // Init reqwest client
-        self.reqwest = Some(ReqwestClient::new(self.options.clone().unwrap()));
-        self.network = network.to_string();
-        info!("Initialized Bitcoin Node endpoint: {:?}", self.url);
-        Ok(())
-    }
     /* Bitcoin Rpc work like this:
     1. Get the best block hash
     2. Get the block
@@ -47,7 +33,7 @@ impl Endpoint for BitcoinNode {
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
             &configuration::ProtocolName::Bitcoin.to_string(),
-            &self.network,
+            &self.endpoint.network.to_string(),
         );
         let bbh_res = self.get_best_block_hash().await;
         let best_block_hash = match bbh_res {
@@ -88,9 +74,9 @@ impl Endpoint for BitcoinNode {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-        let diff = now - self.last_request;
-        if diff < self.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
-            debug!("Rate limit reached for {} ({}s)", self.url, diff);
+        let diff = now - self.endpoint.last_request;
+        if diff < self.endpoint.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
+            debug!("Rate limit reached for {} ({}s)", self.endpoint.url, diff);
             return false;
         }
         true
@@ -98,21 +84,9 @@ impl Endpoint for BitcoinNode {
 }
 
 impl BitcoinNode {
-    pub fn new(
-        endpoint_options: EndpointOptions,
-        network: String,
-    ) -> BitcoinNode {
-        BitcoinNode {
-            url: endpoint_options.clone().url.unwrap(),
-            options: Some(endpoint_options.clone()),
-            reqwest: Some(ReqwestClient::new(endpoint_options.clone())),
-            network,
-            last_request: 0
-        }
-    }
     fn set_last_request(&mut self) {
-        trace!("Set last request for {} to {}", self.url, self.last_request);
-        self.last_request = SystemTime::now()
+        trace!("Set last request for {} to {}", self.endpoint.url, self.endpoint.last_request);
+        self.endpoint.last_request = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
@@ -120,7 +94,7 @@ impl BitcoinNode {
     pub async fn get_blockchain_info(
         &self,
     ) -> Result<Getblockchaininfo, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Get blockchain info for {}", self.url);
+        trace!("Get blockchain info for {}", self.endpoint.url);
         let body = JsonRpcBody {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
@@ -132,7 +106,7 @@ impl BitcoinNode {
     pub async fn get_best_block_hash(
         &self,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Get best block hash for {}", self.url);
+        trace!("Get best block hash for {}", self.endpoint.url);
         let body = JsonRpcBody {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
@@ -145,7 +119,7 @@ impl BitcoinNode {
         &self,
         hash: &str,
     ) -> Result<Getblock, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Get block for {}", self.url);
+        trace!("Get block for {}", self.endpoint.url);
         let body = JsonRpcBody {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
@@ -162,13 +136,13 @@ impl BitcoinNode {
         &self,
         body: &JsonRpcBody,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Run for {}", self.url);
-        let reqwest = self.reqwest.as_ref().unwrap();
+        trace!("Run for {}", self.endpoint.url);
+        let reqwest = self.endpoint.reqwest.as_ref().unwrap();
         let res = reqwest
             .rpc(
                 &body,
                 &configuration::ProtocolName::Bitcoin.to_string(),
-                &self.network,
+                &self.endpoint.network.to_string(),
             )
             .await;
         if res.is_err() {

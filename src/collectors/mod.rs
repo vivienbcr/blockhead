@@ -22,22 +22,13 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinOpts) {
         None => NetworkOptions::default()
     };
 
-    let str_name = network_name.to_string();
-
     let mut rpcs = endpoints.rpc.unwrap_or(Vec::new());
-    rpcs.iter_mut().for_each(|r| r.init(&str_name).unwrap());
+    let mut blockstream = endpoints.blockstream;
 
-    let mut blockstream = match endpoints.blockstream {
-        Some(mut b) => {
-            b.init(&str_name).unwrap();
-            Some(b)
-        }
-        None => None,
-    };
-
-    let mut interval = tokio::time::interval(Duration::from_millis(1000)); // TODO: from config
+    let mut interval = tokio::time::interval(Duration::from_millis(800)); // TODO: from config
     loop {
         interval.tick().await;
+
         let mut futures_vec: Vec<
             Pin<Box<dyn Future<Output = Result<Blockchain, Box<dyn Error + Send + Sync>>> + Send>>,
         > = Vec::new();
@@ -72,6 +63,9 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinOpts) {
             error!("Bitcoin collector: no results from endpoints for network: {:?}", network_name);
             continue;
         }
+        println!("results: {:?}", results.len());
+        println!("results: {:?}", results);
+
         let mut best_chain = blockchain::get_highest_blockchain(results).unwrap();
         best_chain.sort();
         debug!("best_chain: {:?}", best_chain);
