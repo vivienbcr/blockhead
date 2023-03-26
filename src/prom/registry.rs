@@ -8,7 +8,7 @@ use prometheus::Registry;
 use super::metrics::{self, BLOCKCHAIN_HEAD_TIMESTAMP, BLOCKCHAIN_HEAD_TXS, BLOCKCHAIN_HEIGHT};
 
 static REGISTRY: Lazy<Mutex<Registry>> = Lazy::new(|| Mutex::new(Registry::new()));
-
+//TODO: Monitor response time for each endpoint
 pub fn register_custom_metrics() {
     let r = REGISTRY.lock().unwrap();
     r.register(Box::new(metrics::HTTP_REQUEST_CODE_200.clone()))
