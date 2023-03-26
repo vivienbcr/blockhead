@@ -24,8 +24,8 @@ impl Endpoint for Blockstream {
         nb_blocks: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
-            &configuration::ProtocolName::Bitcoin.to_string(),
-            &self.endpoint.network.to_string(),
+            configuration::ProtocolName::Bitcoin,
+            self.endpoint.network.clone()
         );
         let mut height = self.get_chain_height().await?;
         let mut blocks = self.get_blocks_from_height(height).await?;

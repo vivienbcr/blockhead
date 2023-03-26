@@ -32,8 +32,8 @@ impl Endpoint for BitcoinNode {
         n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
-            &configuration::ProtocolName::Bitcoin.to_string(),
-            &self.endpoint.network.to_string(),
+            configuration::ProtocolName::Bitcoin,
+            self.endpoint.network.clone(),
         );
         let bbh_res = self.get_best_block_hash().await;
         let best_block_hash = match bbh_res {

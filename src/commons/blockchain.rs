@@ -1,14 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-use crate::prom;
-#[derive(Deserialize, Serialize, Debug,Clone)]
+use crate::configuration::{NetworkName, ProtocolName};
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Block {
     pub hash: String,
     pub height: u64,
     pub time: u64,
     pub txs: u64,
 }
-#[derive(Deserialize, Serialize, Debug,Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Blockchain {
     pub blocks: Vec<Block>,
     pub height: u64,
@@ -16,7 +17,7 @@ pub struct Blockchain {
     pub network: String,
 }
 impl Blockchain {
-    pub fn new(protocol: &str, network: &str) -> Blockchain {
+    pub fn new(protocol: ProtocolName, network: NetworkName) -> Blockchain {
         Blockchain {
             blocks: Vec::new(),
             height: 0,

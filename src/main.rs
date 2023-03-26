@@ -1,3 +1,4 @@
+use std::process;
 use warp::{Filter};
 pub mod prom;
 pub mod requests;
@@ -5,7 +6,9 @@ pub mod commons;
 pub mod configuration;
 pub mod collectors;
 pub mod endpoints;
-use crate::prom::registry::{metrics_handler, register_custom_metrics};
+pub mod db;
+use db::Redb;
+use crate::{prom::registry::{metrics_handler, register_custom_metrics}, commons::blockchain::Blockchain, configuration::{ProtocolName, NetworkName}, db::DATABASE};
 // use crate::configuration;
 #[macro_use]
 extern crate log;
@@ -15,6 +18,17 @@ use env_logger::Env;
 #[tokio::main]
 async fn main() {
     let env = Env::default().default_filter_or("blockhead=debug");
+
+    match Redb::init() {
+        Ok(_) => {
+            info!("Redb db is initialized");
+        }
+        Err(e) => {
+            error!("Redb db is not created {:?}", e);
+            std::process::exit(1);
+        }
+    }
+    
     env_logger::init_from_env(env);
     let config  =  match configuration::Configuration::new() {
         Ok(c) => {

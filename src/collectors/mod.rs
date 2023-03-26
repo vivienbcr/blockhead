@@ -5,7 +5,7 @@ use futures::{future::join_all, Future};
 use crate::{
     commons::blockchain::{Blockchain, self},
     configuration::{BitcoinOpts, NetworkName, ProtocolName, NetworkOptions},
-    endpoints::Endpoint, prom,
+    endpoints::Endpoint, prom, db::{self, DATABASE},
 };
 
 pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinOpts) {
@@ -76,5 +76,11 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinOpts) {
             best_chain.blocks.last().unwrap().time as i64,
             best_chain.blocks.last().unwrap().txs as i64,
         );
+        let db = DATABASE.get().unwrap();
+
+        // TODO: use a better way to set the best chain
+        let _=  db.set_blockchain(&best_chain, ProtocolName::Bitcoin,NetworkName::Mainnet).unwrap();
+        let resposne = db.get_blockchain(ProtocolName::Bitcoin, NetworkName::Mainnet).unwrap();
+        println!("DB things : {:?}", resposne);
     }
 }

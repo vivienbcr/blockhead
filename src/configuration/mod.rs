@@ -9,9 +9,15 @@ use crate::{endpoints::{bitcoin_node::BitcoinNode, blockstream::{Blockstream}}, 
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Database {
+    pub keep_history: u32,
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct Configuration {
     pub global: Global,
+    pub database : Database,
     #[serde(deserialize_with = "deserialize_protocols")]
     pub protocols: HashMap<ProtocolName,HashMap<NetworkName,ProtocolsOpts>>,
 }
@@ -25,9 +31,11 @@ impl <'de>Deserialize<'de> for Configuration {
         let v: Value = Deserialize::deserialize(deserializer)?;
 
         let global = Global::deserialize(v.as_object().unwrap().get("global").unwrap()).unwrap();
+        let database = Database::deserialize(v.as_object().unwrap().get("database").unwrap()).unwrap();
         let protocols = deserialize_protocols(v.as_object().unwrap().get("protocols").unwrap()).unwrap();
         Ok(Configuration {
             global,
+            database,
             protocols,
         })
     }
