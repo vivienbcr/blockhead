@@ -13,16 +13,16 @@ pub struct Block {
 pub struct Blockchain {
     pub blocks: Vec<Block>,
     pub height: u64,
-    pub protocol: String,
-    pub network: String,
+    // pub protocol: String,
+    // pub network: String,
 }
 impl Blockchain {
     pub fn new(protocol: ProtocolName, network: NetworkName) -> Blockchain {
         Blockchain {
             blocks: Vec::new(),
             height: 0,
-            protocol: protocol.to_string(),
-            network: network.to_string(),
+            // protocol: protocol.to_string(),
+            // network: network.to_string(),
         }
     }
     pub fn add_block(&mut self, block: Block) {

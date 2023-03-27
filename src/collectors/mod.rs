@@ -25,9 +25,9 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinOpts) {
     let mut rpcs = endpoints.rpc.unwrap_or(Vec::new());
     let mut blockstream = endpoints.blockstream;
 
-    let mut interval = tokio::time::interval(Duration::from_millis(800)); // TODO: from config
+    let mut interval = tokio::time::interval(Duration::from_millis(5000)); // TODO: from config
     loop {
-        interval.tick().await;
+        
 
         let mut futures_vec: Vec<
             Pin<Box<dyn Future<Output = Result<Blockchain, Box<dyn Error + Send + Sync>>> + Send>>,
@@ -60,27 +60,31 @@ pub async fn bitcoin(network_name: NetworkName, endpoints: BitcoinOpts) {
             })
             .collect::<Vec<_>>();
         if results.len() == 0 {
-            error!("Bitcoin collector: no results from endpoints for network: {:?}", network_name);
+            error!("Bitcoin collector: no results from endpoints for network: {:?}", network_name.clone());
             continue;
         }
-        println!("results: {:?}", results.len());
-        println!("results: {:?}", results);
-
         let mut best_chain = blockchain::get_highest_blockchain(results).unwrap();
         best_chain.sort();
         debug!("best_chain: {:?}", best_chain);
         prom::registry::set_blockchain_metrics(
-            &best_chain.protocol,
-            &best_chain.network,
+            ProtocolName::Bitcoin,
+            network_name.clone(),
             best_chain.height as i64,
             best_chain.blocks.last().unwrap().time as i64,
             best_chain.blocks.last().unwrap().txs as i64,
         );
         let db = DATABASE.get().unwrap();
 
-        // TODO: use a better way to set the best chain
-        let _=  db.set_blockchain(&best_chain, ProtocolName::Bitcoin,NetworkName::Mainnet).unwrap();
-        let resposne = db.get_blockchain(ProtocolName::Bitcoin, NetworkName::Mainnet).unwrap();
-        println!("DB things : {:?}", resposne);
+
+        let r =  db.set_blockchain(&best_chain, &ProtocolName::Bitcoin,&network_name);
+        match r {
+            Ok(_) => {
+                info!("Blockchain {} {} saved successfully", ProtocolName::Bitcoin, network_name);
+            }
+            Err(e) => {
+                error!("Error saving blockchain {} {}: {}", ProtocolName::Bitcoin, network_name, e);
+            }
+        }
+        interval.tick().await;
     }
 }

@@ -1,11 +1,11 @@
 ---
 # Global options apply per default to every protocol / network / endpoint
 global:
+  # head_length is the number of blocks to be fetched from the head of the chain
   networks_options:
-    # head_length is the number of blocks to be fetched from the head of the chain
     head_length: 5
   # Gobal configuration for all endpoints, if not defined in endpoint, global will be used
-  endpoints:
+  options:
     # Retry define how many time worker will try to call instance if he fail
     retry: 3
     # Delay between every retry
@@ -18,6 +18,9 @@ global:
   metrics:
     # With listenning port metrics will be served
     port: 8081
+database:
+  # How many block will be kept in database
+  keep_history: 100
 protocols:
   bitcoin:
     mainnet:
@@ -36,35 +39,38 @@ protocols:
           rate: 10
       blockstream:
         url: https://sample.bitcoin.mainnet.blockstream.api
-      blockcypher:
-        url: https://sample.bitcoin.mainnet.blockcypher.api
-        options:
-          rate: 60
-
-  ethereum:
-    mainnet:
-      rpc:
-      - url: https://sample.eth.mainnet.rpc
-      infura:
-        url: https://sample.eth.mainnet.infura
-    sepolia:
-      rpc:
-      - url: https://sample.eth.sepolia.rpc
-      infura:
-        url: https://sample.eth.sepolia.infura
-  tezos:
-    mainnet:
-      rpc:
-      - url: https://sample.tezos.mainnet.rpc
-      tzkt:
-        url: https://sample.tezos.mainnet.tzkt.api
-      tzstats:
-        url: https://sample.tezos.mainnet.tzstats.api
-    ghostnet:
-      rpc:
-      - url: https://sample.tezos.ghostnet.rpc.api
-      tzkt:
-        url: https://sample.tezos.ghostnet.tzkt.api
-      tzstats:
-        url: https://sample.tezos.ghostnet.tzstats.api
+  ## Other options not implemented yet
+  #     blockcypher:
+  #       url: https://sample.bitcoin.mainnet.blockcypher.api
+  #       token: xxxxxxx
+  #       options:
+  #         retry: 10
+  #         delay: 1
+  #         rate: 1000 
+  # ethereum:
+  #   mainnet:
+  #     rpc:
+  #     - url: https://sample.eth.mainnet.rpc
+  #     infura:
+  #       url: https://sample.eth.mainnet.infura
+  #   sepolia:
+  #     rpc:
+  #     - url: https://sample.eth.sepolia.rpc
+  #     infura:
+  #       url: https://sample.eth.sepolia.infura
+  # tezos:
+  #   mainnet:
+  #     rpc:
+  #     - url: https://sample.tezos.mainnet.rpc
+  #     tzkt:
+  #       url: https://sample.tezos.mainnet.tzkt.api
+  #     tzstats:
+  #       url: https://sample.tezos.mainnet.tzstats.api
+  #   ghostnet:
+  #     rpc:
+  #     - url: https://sample.tezos.ghostnet.rpc.api
+  #     tzkt:
+  #       url: https://sample.tezos.ghostnet.tzkt.api
+  #     tzstats:
+  #       url: https://sample.tezos.ghostnet.tzstats.api
 

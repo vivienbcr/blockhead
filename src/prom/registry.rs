@@ -1,9 +1,10 @@
 use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
-use warp::{Rejection, Reply};
 
 use prometheus::Registry;
+
+use crate::configuration::{NetworkName, ProtocolName};
 
 use super::metrics::{self, BLOCKCHAIN_HEAD_TIMESTAMP, BLOCKCHAIN_HEAD_TXS, BLOCKCHAIN_HEIGHT};
 
@@ -23,24 +24,6 @@ pub fn register_custom_metrics() {
         .expect("collector can be registered");
     r.register(Box::new(metrics::BLOCKCHAIN_HEAD_TXS.clone()))
         .expect("collector can be registered");
-}
-pub async fn metrics_handler() -> Result<impl Reply, Rejection> {
-    use prometheus::Encoder;
-    let encoder = prometheus::TextEncoder::new();
-
-    let mut buffer = Vec::new();
-    if let Err(e) = encoder.encode(&prometheus::gather(), &mut buffer) {
-        error!("could not encode prometheus metrics: {}", e);
-    };
-    let res = match String::from_utf8(buffer.clone()) {
-        Ok(v) => v,
-        Err(e) => {
-            error!("prometheus metrics could not be from_utf8'd: {}", e);
-            String::default()
-        }
-    };
-    buffer.clear();
-    Ok(res)
 }
 pub fn track_status_code(url: &str,method : &str, status_code: u16, protocol: &str, network: &str) {
    // retain only https://domain.tld
@@ -66,19 +49,19 @@ pub fn track_status_code(url: &str,method : &str, status_code: u16, protocol: &s
 }
 
 pub fn set_blockchain_metrics(
-    network: &str,
-    protocol: &str,
+    protocol: ProtocolName,
+    network: NetworkName,
     head_height: i64,
     head_time: i64,
     head_txs: i64,
 ) {
     BLOCKCHAIN_HEIGHT
-        .with_label_values(&[protocol, network])
+        .with_label_values(&[&protocol.to_string(), &network.to_string()])
         .set(head_height);
     BLOCKCHAIN_HEAD_TIMESTAMP
-        .with_label_values(&[protocol, network])
+        .with_label_values(&[&protocol.to_string(), &network.to_string()])
         .set(head_time);
     BLOCKCHAIN_HEAD_TXS
-        .with_label_values(&[protocol, network])
+        .with_label_values(&[&protocol.to_string(), &network.to_string()])
         .set(head_txs);
 }

@@ -69,10 +69,11 @@ impl Redb {
         write_txn.commit()?;
         Ok(())
     }
-    fn to_db_key(protocol:ProtocolName, network: NetworkName) -> String {
+    fn to_db_key(protocol:&ProtocolName, network: &NetworkName) -> String {
         format!("{}-{}", protocol.to_string(), network.to_string())
     }
-    pub fn get_blockchain(&self, protocol : ProtocolName,network : NetworkName) -> Result<blockchain::Blockchain, Box<dyn Error + Send + Sync>> {
+    pub fn get_blockchain(&self, protocol : &ProtocolName,network : &NetworkName) -> Result<blockchain::Blockchain, Box<dyn Error + Send + Sync>> {
+        debug!("Redb get_blockchain({:?},{:?})", protocol, network);
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TABLE)?;
         let key = Redb::to_db_key(protocol, network);
@@ -89,8 +90,9 @@ impl Redb {
         }
     }
 
-    pub fn set_blockchain(&self, blockchain: &blockchain::Blockchain,protocol : ProtocolName,network : NetworkName) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let chain_db = self.get_blockchain(protocol.clone(),network.clone());
+    pub fn set_blockchain(&self, blockchain: &blockchain::Blockchain,protocol :&ProtocolName,network : &NetworkName) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        debug!("Redb set_blockchain({:?},{:?})", protocol, network);
+        let chain_db = self.get_blockchain(&protocol, &network);
         let _ = match chain_db {
             Ok(data) => data,
             Err(e)=>{
@@ -103,7 +105,7 @@ impl Redb {
         // avoid to insert the same block twice
         // a block with same height but different hash, blockchain param should have priority
         // TODO: if config to know how many block to keep in db
-        let key = Redb::to_db_key(protocol, network);
+        let key = Redb::to_db_key(&protocol, &network);
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TABLE)?;

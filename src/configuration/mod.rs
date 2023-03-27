@@ -20,6 +20,8 @@ pub struct Configuration {
     pub database : Database,
     #[serde(deserialize_with = "deserialize_protocols")]
     pub protocols: HashMap<ProtocolName,HashMap<NetworkName,ProtocolsOpts>>,
+    #[serde(skip)]
+    pub enabled_proto_net : HashMap<ProtocolName,Vec<NetworkName>>,
 }
 // Deserialize configuration should be used to be sure global configuration will be deserialized first
 impl <'de>Deserialize<'de> for Configuration {
@@ -33,10 +35,18 @@ impl <'de>Deserialize<'de> for Configuration {
         let global = Global::deserialize(v.as_object().unwrap().get("global").unwrap()).unwrap();
         let database = Database::deserialize(v.as_object().unwrap().get("database").unwrap()).unwrap();
         let protocols = deserialize_protocols(v.as_object().unwrap().get("protocols").unwrap()).unwrap();
+        let mut enabled_proto_net = HashMap::new();
+        protocols.iter().for_each(|(proto,net)|{
+            enabled_proto_net.insert(proto.clone(),net.keys().cloned().collect());
+        });
+        
+
+
         Ok(Configuration {
             global,
             database,
             protocols,
+            enabled_proto_net
         })
     }
 }
@@ -130,7 +140,7 @@ pub struct Metrics {
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Server {
-    pub port: u32,
+    pub port: u16,
 }
 #[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
 pub enum NetworkName {
@@ -147,6 +157,8 @@ pub enum NetworkName {
     #[serde(rename = "")]
     InitState
 }
+
+
 impl NetworkName {
     pub fn to_string(&self) -> String {
         match self {
@@ -173,7 +185,23 @@ impl FromStr for NetworkName {
         }
     }
 }
+impl std::fmt::Display for NetworkName {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            NetworkName::Mainnet => write!(f, "mainnet"),
+            NetworkName::Testnet => write!(f, "testnet"),
+            NetworkName::Goerli => write!(f, "goerli"),
+            NetworkName::Sepolia => write!(f, "sepolia"),
+            NetworkName::Ghostnet => write!(f, "ghostnet"),
+            NetworkName::InitState => write!(f, ""),
+        }
+    }
+}
 
+pub fn get_enabled_protocol_network()->HashMap<ProtocolName, Vec<NetworkName>>{
+    let config = CONFIGURATION.get().unwrap();
+    config.enabled_proto_net.clone()
+}
 
 #[derive(Serialize, Debug, Clone,Eq, Hash, PartialEq)]
 pub enum ProtocolName {
@@ -318,7 +346,6 @@ impl<'de>Deserialize<'de> for Endpoint {
     where
         D: serde::Deserializer<'de>,
     {
-        error!("deserialize endpoint");
         let v: Value = Deserialize::deserialize(deserializer)?;
         let url = v.get("url").ok_or_else(|| serde::de::Error::custom("Missing url"))?.as_str().ok_or_else(|| serde::de::Error::custom("Invalid url"))?.to_string();
         let options = v.get("options");
