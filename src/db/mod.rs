@@ -2,11 +2,14 @@ use std::error::Error;
 
 use once_cell::sync::OnceCell;
 use redb::{Database, ReadableTable, TableDefinition};
-use serde::{Deserialize, };
+use serde::Deserialize;
 use std::{io, panic};
 use tokio::sync::oneshot::error;
 
-use crate::{commons::blockchain, configuration::{NetworkName, ProtocolName}};
+use crate::{
+    commons::blockchain::{self, Block},
+    configuration::{NetworkName, ProtocolName, CONFIGURATION},
+};
 const TABLE: TableDefinition<&str, &str> = TableDefinition::new("blockchain");
 pub static DATABASE: OnceCell<Redb> = OnceCell::new();
 #[derive(Debug)]
@@ -60,7 +63,11 @@ impl Redb {
             }
         }
     }
-    pub fn set(&self, key: &str, value: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn set(
+        &self,
+        key: &str,
+        value: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TABLE)?;
@@ -69,10 +76,14 @@ impl Redb {
         write_txn.commit()?;
         Ok(())
     }
-    fn to_db_key(protocol:&ProtocolName, network: &NetworkName) -> String {
+    fn to_db_key(protocol: &ProtocolName, network: &NetworkName) -> String {
         format!("{}-{}", protocol.to_string(), network.to_string())
     }
-    pub fn get_blockchain(&self, protocol : &ProtocolName,network : &NetworkName) -> Result<blockchain::Blockchain, Box<dyn Error + Send + Sync>> {
+    pub fn get_blockchain(
+        &self,
+        protocol: &ProtocolName,
+        network: &NetworkName,
+    ) -> Result<blockchain::Blockchain, Box<dyn Error + Send + Sync>> {
         debug!("Redb get_blockchain({:?},{:?})", protocol, network);
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TABLE)?;
@@ -90,28 +101,62 @@ impl Redb {
         }
     }
 
-    pub fn set_blockchain(&self, blockchain: &blockchain::Blockchain,protocol :&ProtocolName,network : &NetworkName) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn set_blockchain(
+        &self,
+        blockchain: &blockchain::Blockchain,
+        protocol: &ProtocolName,
+        network: &NetworkName,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb set_blockchain({:?},{:?})", protocol, network);
         let chain_db = self.get_blockchain(&protocol, &network);
-        let _ = match chain_db {
+        let mut chain_db = match chain_db {
             Ok(data) => data,
-            Err(e)=>{
-                error!("Redb get_blockchain return an error {:?} init empty blockchain", e);
+            Err(e) => {
+                error!(
+                    "Redb get_blockchain return an error {:?} init empty blockchain",
+                    e
+                );
                 blockchain::Blockchain::new(protocol.clone(), network.clone())
             }
         };
-        // TODO:
-        // we need to merge the new blockchain with the old one
-        // avoid to insert the same block twice
-        // a block with same height but different hash, blockchain param should have priority
-        // TODO: if config to know how many block to keep in db
+        if chain_db.height == blockchain.height {
+            debug!("Redb set_blockchain: same height, do nothing");
+            return Ok(());
+        }
+
+        let keep = CONFIGURATION.get().unwrap().database.keep_history;
+
+        let mut merged_blocks: Vec<Block> = chain_db.blocks
+            .clone()
+            .into_iter()
+            .chain(blockchain.blocks.clone().into_iter())
+            .fold(Vec::new(), |mut acc, b| {
+                // if block is not in acc, add it
+                if !acc.iter().any(|block: &Block| block.height == b.height) {
+                    trace!("Add block {}", b.height);
+                    acc.push(b);
+                }else{
+                    // by using chain on param blockchain at second arg, we ensure blockchain param have priority and will replace the block in db
+                    if let Some(idx) = acc.iter().position(|block| block.height == b.height) {
+                        trace!(
+                            "Replace block {} with {}",
+                            acc[idx].height, b.height
+                        );
+                        acc[idx] = b;
+                    }
+                }
+                acc
+            });
+        merged_blocks.sort_by(|a, b| b.height.cmp(&a.height));
+        let merged_blocks = merged_blocks.iter().take(keep as usize).cloned().collect();
+        let mut blockchain = blockchain.clone();
+        blockchain.blocks = merged_blocks;
         let key = Redb::to_db_key(&protocol, &network);
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TABLE)?;
-            let json_value = serde_json::to_string(blockchain)?;
+            let json_value = serde_json::to_string(&blockchain)?;
             table.insert(key.as_str(), json_value.as_str())?;
-            
         }
         write_txn.commit()?;
         Ok(())
@@ -123,10 +168,10 @@ impl Redb {
         last_update :
         blocks : [
             {
-                hash : 
-                height : 
-                time : 
-                txs : 
+                hash :
+                height :
+                time :
+                txs :
             }
         ]
     }

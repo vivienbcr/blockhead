@@ -10,10 +10,9 @@ pub mod prom;
 pub mod requests;
 use crate::{
     api::{app, metrics},
-    commons::blockchain::Blockchain,
-    configuration::{NetworkName, ProtocolName},
-    db::DATABASE,
     prom::registry::register_custom_metrics,
+    collectors::{bitcoin}
+
 };
 use db::Redb;
 // use crate::configuration;
@@ -61,7 +60,7 @@ async fn main() -> std::io::Result<()> {
                     let endpoints = map_network.1.clone(); // At this point, ProtocolsOpts is only BitcoinOpts
                     match &endpoints {
                         configuration::ProtocolsOpts::Bitcoin(endpoints) => {
-                            tokio::task::spawn(collectors::bitcoin(network, endpoints.clone()));
+                            tokio::task::spawn(bitcoin::bitcoin(network, endpoints.clone()));
                         }
                         _ => {}
                     }

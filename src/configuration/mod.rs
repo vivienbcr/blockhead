@@ -414,6 +414,7 @@ pub const DEFAULT_HEAD_LENGTH: u32 = 5;
 pub const DEFAULT_ENDPOINT_RETRY: u32 = 3;
 pub const DEFAULT_ENDPOINT_DELAY: u32 = 1;
 pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
+pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
 
 impl Configuration {
     pub fn new() -> Result<Self, ConfigError> {
@@ -423,6 +424,7 @@ impl Configuration {
         .set_default("global.server.port", DEFAULT_SERVER_PORT)?
         .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
         .set_default("global.networks_options.head_length", DEFAULT_HEAD_LENGTH)?
+        .set_default("database.keep_history",DEFAULT_DATABASE_KEEP_HISTORY )?
         .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
         .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
         .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
