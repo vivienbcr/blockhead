@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::configuration::{NetworkName, ProtocolName};
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Block {
     pub hash: String,

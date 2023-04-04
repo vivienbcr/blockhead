@@ -53,15 +53,15 @@ impl Blockstream {
         height: u32,
     ) -> Result<Vec<Block>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/{}", self.endpoint.url, height);
-        self.run(&url).await
+        self.run_request(&url).await
     }
 
     async fn get_chain_height(&self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/tip/height", self.endpoint.url);
-        self.run(&url).await
+        self.run_request(&url).await
     }
 
-    async fn run<T: DeserializeOwned>(
+    async fn run_request<T: DeserializeOwned>(
         &self,
         url: &str,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {

@@ -1,13 +1,10 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use async_trait::async_trait;
 use chrono::DateTime;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     commons::blockchain::{self, Block},
-    configuration::{self, EndpointActions, EndpointOptions, NetworkName, ProtocolName},
-    requests::client::ReqwestClient,
+    configuration::{self, EndpointActions, NetworkName, ProtocolName},
 };
 
 use super::ProviderActions;
@@ -45,7 +42,7 @@ impl Blockcypher {
     async fn get_chain_height(&mut self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get head blockcypher");
         let url = format!("{}/v1/btc/main", self.endpoint.url);
-        let res = self.run::<HeightResponse>(url).await;
+        let res = self.run_request::<HeightResponse>(&url).await;
         match res {
             Ok(res) => Ok(res.height),
             Err(e) => {
@@ -64,7 +61,7 @@ impl Blockcypher {
         let mut blocks = Vec::new();
         for i in 0..n_block {
             let url = format!("{}/v1/btc/main/blocks/{}", self.endpoint.url, height - i);
-            let res = self.run::<BlockResponse>(url).await;
+            let res = self.run_request::<BlockResponse>(&url).await;
             match res {
                 Ok(res) => {
                     let datetime = DateTime::parse_from_rfc3339(&res.time).unwrap();
@@ -84,9 +81,9 @@ impl Blockcypher {
         }
         Ok(blocks)
     }
-    async fn run<T: DeserializeOwned>(
+    async fn run_request<T: DeserializeOwned>(
         &mut self,
-        url: String,
+        url: &str,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Run blockcypher request: {}", url);
         let client = self.endpoint.reqwest.clone().unwrap();

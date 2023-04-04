@@ -66,18 +66,6 @@ impl ProviderActions for BitcoinNode {
 }
 
 impl BitcoinNode {
-    pub async fn get_blockchain_info(
-        &self,
-    ) -> Result<Getblockchaininfo, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Get blockchain info for {}", self.endpoint.url);
-        let body = JsonRpcBody {
-            jsonrpc: JSON_RPC_VER.to_string(),
-            id: 1,
-            method: "getblockchaininfo".to_string(),
-            params: vec![],
-        };
-        self.run(&body).await
-    }
     pub async fn get_best_block_hash(
         &self,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -88,7 +76,7 @@ impl BitcoinNode {
             method: "getbestblockhash".to_string(),
             params: vec![],
         };
-        self.run(&body).await
+        self.run_request(&body).await
     }
     pub async fn get_block(
         &self,
@@ -104,10 +92,10 @@ impl BitcoinNode {
                 JsonRpcParams::Number(1),
             ],
         };
-        self.run(&body).await
+        self.run_request(&body).await
     }
 
-    async fn run<T: DeserializeOwned>(
+    async fn run_request<T: DeserializeOwned>(
         &self,
         body: &JsonRpcBody,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
