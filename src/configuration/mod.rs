@@ -1,11 +1,18 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{
+    collections::HashMap,
+    str::FromStr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use config::{self, ConfigError, File};
 use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use crate::{endpoints::{bitcoin_node::BitcoinNode, blockstream::{Blockstream}}, requests::client::ReqwestClient};
+use crate::{
+    endpoints::{bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream},
+    requests::client::ReqwestClient,
+};
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
@@ -17,14 +24,14 @@ pub struct Database {
 #[derive(Serialize, Debug, Clone)]
 pub struct Configuration {
     pub global: Global,
-    pub database : Database,
+    pub database: Database,
     #[serde(deserialize_with = "deserialize_protocols")]
-    pub protocols: HashMap<ProtocolName,HashMap<NetworkName,ProtocolsOpts>>,
+    pub protocols: HashMap<ProtocolName, HashMap<NetworkName, ProtocolsOpts>>,
     #[serde(skip)]
-    pub enabled_proto_net : HashMap<ProtocolName,Vec<NetworkName>>,
+    pub enabled_proto_net: HashMap<ProtocolName, Vec<NetworkName>>,
 }
 // Deserialize configuration should be used to be sure global configuration will be deserialized first
-impl <'de>Deserialize<'de> for Configuration {
+impl<'de> Deserialize<'de> for Configuration {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -33,25 +40,27 @@ impl <'de>Deserialize<'de> for Configuration {
         let v: Value = Deserialize::deserialize(deserializer)?;
 
         let global = Global::deserialize(v.as_object().unwrap().get("global").unwrap()).unwrap();
-        let database = Database::deserialize(v.as_object().unwrap().get("database").unwrap()).unwrap();
-        let protocols = deserialize_protocols(v.as_object().unwrap().get("protocols").unwrap()).unwrap();
+        let database =
+            Database::deserialize(v.as_object().unwrap().get("database").unwrap()).unwrap();
+        let protocols =
+            deserialize_protocols(v.as_object().unwrap().get("protocols").unwrap()).unwrap();
         let mut enabled_proto_net = HashMap::new();
-        protocols.iter().for_each(|(proto,net)|{
-            enabled_proto_net.insert(proto.clone(),net.keys().cloned().collect());
+        protocols.iter().for_each(|(proto, net)| {
+            enabled_proto_net.insert(proto.clone(), net.keys().cloned().collect());
         });
-        
-
 
         Ok(Configuration {
             global,
             database,
             protocols,
-            enabled_proto_net
+            enabled_proto_net,
         })
     }
 }
 
-fn deserialize_protocols<'de, D>(deserializer: D) -> Result<HashMap<ProtocolName, HashMap<NetworkName,ProtocolsOpts>>, D::Error>
+fn deserialize_protocols<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<ProtocolName, HashMap<NetworkName, ProtocolsOpts>>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -61,54 +70,69 @@ where
     for (proto_k, v) in v.as_object().unwrap() {
         let proto_k = ProtocolName::from_str(proto_k).unwrap();
         for (k, v) in v.as_object().unwrap() {
-            let k = NetworkName::from_str(k).unwrap();          
+            let k = NetworkName::from_str(k).unwrap();
             match proto_k {
                 ProtocolName::Bitcoin => {
                     debug!("deserialize bitcoin {:?}", v);
                     let mut bitcoin_opts = BitcoinOpts::default();
                     for (endpoint_param_name, endpoint_obj) in v.as_object().unwrap() {
                         match endpoint_param_name.as_str() {
-                            "network_options"=>{
-                                let network_opts = NetworkOptions::deserialize(endpoint_obj).unwrap();
+                            "network_options" => {
+                                let network_opts =
+                                    NetworkOptions::deserialize(endpoint_obj).unwrap();
                                 bitcoin_opts.network_options = Some(network_opts);
-                            },
-                            "rpc" =>{
-                                let rpc_endpts : Vec<Endpoint> =serde_json::from_str(&endpoint_obj.to_string()).unwrap();
-                                let bitcoin_nodes = rpc_endpts.iter().map(| e| {
-                                    let mut e = e.clone();
-                                    e.network = k.clone();
-                                    BitcoinNode::new(e.clone())
-                                }).collect();
+                            }
+                            "rpc" => {
+                                let rpc_endpts: Vec<Endpoint> =
+                                    serde_json::from_str(&endpoint_obj.to_string()).unwrap();
+                                let bitcoin_nodes = rpc_endpts
+                                    .iter()
+                                    .map(|e| {
+                                        let mut e = e.clone();
+                                        e.network = k.clone();
+                                        BitcoinNode::new(e.clone())
+                                    })
+                                    .collect();
                                 bitcoin_opts.rpc = Some(bitcoin_nodes);
                             }
                             _ => {
                                 let mut endpoint = Endpoint::deserialize(endpoint_obj).unwrap();
                                 endpoint.network = k.clone();
-                                let endpoint_param_name = BitcoinAvailableEndpoints::from_str(endpoint_param_name);
+                                let endpoint_param_name =
+                                    BitcoinAvailableEndpoints::from_str(endpoint_param_name);
                                 match endpoint_param_name {
                                     Ok(BitcoinAvailableEndpoints::Blockstream) => {
                                         let blockstream = Blockstream::new(endpoint);
                                         bitcoin_opts.blockstream = Some(blockstream);
                                     }
+                                    Ok(BitcoinAvailableEndpoints::Blockcypher) => {
+                                        let blockcypher = Blockcypher::new(endpoint);
+                                        bitcoin_opts.blockcypher = Some(blockcypher);
+                                    }
                                     _ => {
                                         error!("endpoint_param_name: {:?}", endpoint_param_name);
-
                                     }
-                                }                                
+                                }
                             }
                         }
                     }
 
-                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtocolsOpts::Bitcoin(bitcoin_opts));
-                },
+                    map.entry(proto_k.clone())
+                        .or_insert(HashMap::new())
+                        .insert(k, ProtocolsOpts::Bitcoin(bitcoin_opts));
+                }
                 ProtocolName::Ethereum => {
                     let endpoints = EthereumEndpoints::deserialize(v).unwrap();
-                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtocolsOpts::Ethereum(endpoints));
-                },
+                    map.entry(proto_k.clone())
+                        .or_insert(HashMap::new())
+                        .insert(k, ProtocolsOpts::Ethereum(endpoints));
+                }
                 ProtocolName::Tezos => {
                     let endpoints = TezosEndpoints::deserialize(v).unwrap();
-                    map.entry(proto_k.clone()).or_insert(HashMap::new()).insert(k, ProtocolsOpts::Tezos(endpoints));
-                },
+                    map.entry(proto_k.clone())
+                        .or_insert(HashMap::new())
+                        .insert(k, ProtocolsOpts::Tezos(endpoints));
+                }
             }
         }
     }
@@ -130,8 +154,13 @@ where
 {
     let endpoint_opt = EndpointOptions::deserialize(deserializer).unwrap();
     debug!("deserialize_global_endpoint_options: {:?}", endpoint_opt);
-    CONFIGURATION_GLOB_ENDPOINT_OPTION.set(endpoint_opt.clone()).unwrap();
-    debug!("set CONFIGURATION_GLOB_ENDPOINT_OPTION: {:?}", CONFIGURATION_GLOB_ENDPOINT_OPTION.get().unwrap());
+    CONFIGURATION_GLOB_ENDPOINT_OPTION
+        .set(endpoint_opt.clone())
+        .unwrap();
+    debug!(
+        "set CONFIGURATION_GLOB_ENDPOINT_OPTION: {:?}",
+        CONFIGURATION_GLOB_ENDPOINT_OPTION.get().unwrap()
+    );
     Ok(endpoint_opt)
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -142,7 +171,7 @@ pub struct Metrics {
 pub struct Server {
     pub port: u16,
 }
-#[derive(Deserialize, Serialize, Debug, Clone,Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq)]
 pub enum NetworkName {
     #[serde(rename = "mainnet")]
     Mainnet,
@@ -155,9 +184,8 @@ pub enum NetworkName {
     #[serde(rename = "ghostnet")]
     Ghostnet,
     #[serde(rename = "")]
-    InitState
+    InitState,
 }
-
 
 impl NetworkName {
     pub fn to_string(&self) -> String {
@@ -167,7 +195,7 @@ impl NetworkName {
             NetworkName::Goerli => "goerli".to_string(),
             NetworkName::Sepolia => "sepolia".to_string(),
             NetworkName::Ghostnet => "ghostnet".to_string(),
-            NetworkName::InitState => "".to_string()
+            NetworkName::InitState => "".to_string(),
         }
     }
 }
@@ -180,7 +208,7 @@ impl FromStr for NetworkName {
             "goerli" => Ok(NetworkName::Goerli),
             "sepolia" => Ok(NetworkName::Sepolia),
             "ghostnet" => Ok(NetworkName::Ghostnet),
-            ""=> Ok(NetworkName::InitState),
+            "" => Ok(NetworkName::InitState),
             _ => Err(format!("{} is not a valid network name", s)),
         }
     }
@@ -198,12 +226,12 @@ impl std::fmt::Display for NetworkName {
     }
 }
 
-pub fn get_enabled_protocol_network()->HashMap<ProtocolName, Vec<NetworkName>>{
+pub fn get_enabled_protocol_network() -> HashMap<ProtocolName, Vec<NetworkName>> {
     let config = CONFIGURATION.get().unwrap();
     config.enabled_proto_net.clone()
 }
 
-#[derive(Serialize, Debug, Clone,Eq, Hash, PartialEq)]
+#[derive(Serialize, Debug, Clone, Eq, Hash, PartialEq)]
 pub enum ProtocolName {
     #[serde(rename = "bitcoin")]
     Bitcoin,
@@ -223,7 +251,7 @@ impl std::fmt::Display for ProtocolName {
     }
 }
 
-impl<'de>Deserialize<'de> for ProtocolName {
+impl<'de> Deserialize<'de> for ProtocolName {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -250,7 +278,7 @@ impl FromStr for ProtocolName {
     }
 }
 
-#[derive( Serialize,Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ProtocolsOpts {
     Bitcoin(BitcoinOpts),
     Ethereum(EthereumEndpoints),
@@ -262,7 +290,7 @@ pub struct NetworkOptions {
     pub head_length: Option<u32>,
 }
 impl NetworkOptions {
-    pub fn init(&mut self){
+    pub fn init(&mut self) {
         let global_config = CONFIGURATION.get().unwrap();
         let global_networks_options = global_config.global.networks_options.clone();
         if self.head_length.is_none() {
@@ -276,14 +304,14 @@ impl NetworkOptions {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug,Clone,Default)]
-pub struct BitcoinOpts { 
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct BitcoinOpts {
     pub network_options: Option<NetworkOptions>,
     pub rpc: Option<Vec<BitcoinNode>>,
     pub blockstream: Option<Blockstream>,
-    pub blockcypher: Option<Endpoint>,
+    pub blockcypher: Option<Blockcypher>,
 }
-#[derive(Deserialize, Serialize, Debug,Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum BitcoinAvailableEndpoints {
     Blockstream,
     Blockcypher,
@@ -315,8 +343,6 @@ impl FromStr for BitcoinAvailableEndpoints {
     }
 }
 
-
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct EthereumEndpoints {
     pub rpc: Option<Vec<Endpoint>>,
@@ -329,7 +355,7 @@ pub struct TezosEndpoints {
     pub tzstats: Option<Endpoint>,
     pub tzkt: Option<Endpoint>,
 }
-#[derive( Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Endpoint {
     pub url: String,
     // pub options: Option<EndpointOptions>,
@@ -340,24 +366,63 @@ pub struct Endpoint {
     #[serde(skip)]
     pub last_request: u64,
 }
+impl Endpoint {
+    pub fn test_new(url: &str, net: NetworkName) -> Self {
+        let opt = EndpointOptions::test_new(url);
+        Endpoint {
+            last_request: 0,
+            url: url.to_string(),
+            network: net,
+            reqwest: Some(ReqwestClient::new(opt)),
+        }
+    }
+}
+impl EndpointActions for Endpoint {
+    fn set_last_request(&mut self) {
+        self.last_request = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+    }
+    fn available(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        let diff = now - self.last_request;
+        if diff < self.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
+            debug!("Rate limit reached for {} ({}s)", self.url, diff);
+            return false;
+        }
+        true
+    }
+}
+pub trait EndpointActions {
+    fn set_last_request(&mut self);
+    fn available(&self) -> bool;
+}
 // Endpoint deserialization will substitute options field, to init reqwest client
-impl<'de>Deserialize<'de> for Endpoint {
+impl<'de> Deserialize<'de> for Endpoint {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let v: Value = Deserialize::deserialize(deserializer)?;
-        let url = v.get("url").ok_or_else(|| serde::de::Error::custom("Missing url"))?.as_str().ok_or_else(|| serde::de::Error::custom("Invalid url"))?.to_string();
+        let url = v
+            .get("url")
+            .ok_or_else(|| serde::de::Error::custom("Missing url"))?
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("Invalid url"))?
+            .to_string();
         let options = v.get("options");
         let options = match options {
             Some(options) => {
-                let mut options = serde_json::from_value::<EndpointOptions>(options.clone()).map_err(|e| serde::de::Error::custom(format!("Invalid options: {}", e)))?;
+                let mut options = serde_json::from_value::<EndpointOptions>(options.clone())
+                    .map_err(|e| serde::de::Error::custom(format!("Invalid options: {}", e)))?;
                 options.init(Some(&url));
                 options
-            },
-            None => {
-                EndpointOptions::default()
             }
+            None => EndpointOptions::default(),
         };
 
         Ok(Endpoint {
@@ -367,8 +432,6 @@ impl<'de>Deserialize<'de> for Endpoint {
             network: NetworkName::InitState,
             last_request: 0,
         })
-
-        
     }
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -379,7 +442,7 @@ pub struct EndpointOptions {
     pub rate: Option<u32>,
 }
 impl EndpointOptions {
-    pub fn init(&mut self, url : Option<&str>){
+    pub fn init(&mut self, url: Option<&str>) {
         if url.is_some() {
             self.url = Some(url.unwrap().to_string());
         }
@@ -394,6 +457,14 @@ impl EndpointOptions {
             self.rate = global_endpoint_conf.rate;
         }
     }
+    pub fn test_new(url: &str) -> Self {
+        EndpointOptions {
+            url: Some(url.to_string()),
+            retry: Some(3),
+            delay: Some(1),
+            rate: Some(5),
+        }
+    }
 }
 impl Default for EndpointOptions {
     fn default() -> Self {
@@ -402,9 +473,9 @@ impl Default for EndpointOptions {
         EndpointOptions {
             url: None,
             retry: global_endpoint_conf.retry,
-            delay: global_endpoint_conf.delay, 
-            rate:  global_endpoint_conf.rate,
-        } 
+            delay: global_endpoint_conf.delay,
+            rate: global_endpoint_conf.rate,
+        }
     }
 }
 
@@ -421,13 +492,13 @@ impl Configuration {
         // TODO: config file should be overridable by env variables
         // TODO: config file should be overridable by cli args
         let builder = config::Config::builder()
-        .set_default("global.server.port", DEFAULT_SERVER_PORT)?
-        .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
-        .set_default("global.networks_options.head_length", DEFAULT_HEAD_LENGTH)?
-        .set_default("database.keep_history",DEFAULT_DATABASE_KEEP_HISTORY )?
-        .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
-        .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
-        .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
+            .set_default("global.server.port", DEFAULT_SERVER_PORT)?
+            .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
+            .set_default("global.networks_options.head_length", DEFAULT_HEAD_LENGTH)?
+            .set_default("database.keep_history", DEFAULT_DATABASE_KEEP_HISTORY)?
+            .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
+            .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
+            .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
             .add_source(File::with_name("config.yaml"))
             .build()?;
         let r: Result<Configuration, ConfigError> = builder.try_deserialize();

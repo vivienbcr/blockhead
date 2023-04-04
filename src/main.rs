@@ -1,5 +1,4 @@
 use futures::future;
-use std::process;
 pub mod api;
 pub mod collectors;
 pub mod commons;
@@ -10,13 +9,12 @@ pub mod prom;
 pub mod requests;
 use crate::{
     api::{app, metrics},
+    collectors::bitcoin,
     prom::registry::register_custom_metrics,
-    collectors::{bitcoin}
-
 };
 use db::Redb;
 // use crate::configuration;
-use actix_web::{get, middleware, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware, App, HttpServer};
 #[macro_use]
 extern crate log;
 
@@ -24,7 +22,7 @@ use env_logger::Env;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let env = Env::default().default_filter_or("blockhead=debug");
+    let env = Env::default().default_filter_or("blockhead=trace");
 
     match Redb::init() {
         Ok(_) => {
@@ -73,14 +71,13 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
-
     let metrics_port = config.global.metrics.port;
     let server_port = config.global.server.port;
-    println!(
+    info!(
         "Started prometheus metrics server at http://localhost:{}/metrics",
         metrics_port
     );
-    println!(
+    info!(
         "Started blockhead server at http://localhost:{}/",
         server_port
     );

@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, HttpResponse, Responder};
 
 #[get("/")]
 async fn prometheus_handler() -> impl Responder {

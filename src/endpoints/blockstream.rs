@@ -1,16 +1,12 @@
-use std::{
-    time::{SystemTime, UNIX_EPOCH},
-};
-
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
-    configuration::{self},
+    configuration::{self, EndpointActions},
 };
 
-use super::Endpoint;
+use super::ProviderActions;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Blockstream {
@@ -18,15 +14,12 @@ pub struct Blockstream {
 }
 
 #[async_trait]
-impl Endpoint for Blockstream {
+impl ProviderActions for Blockstream {
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
-            configuration::ProtocolName::Bitcoin,
-            self.endpoint.network.clone()
-        );
+        let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let mut height = self.get_chain_height().await?;
         let mut blocks = self.get_blocks_from_height(height).await?;
         while blocks.len() > 0 && blockchain.blocks.len() < nb_blocks as usize {
@@ -41,7 +34,7 @@ impl Endpoint for Blockstream {
             height = height - 10;
             blocks = self.get_blocks_from_height(height).await?;
         }
-        self.set_last_request();
+        self.endpoint.set_last_request();
         blockchain.sort();
         // remove blocks to return vec len = nb_blocks
         if blockchain.blocks.len() > nb_blocks as usize {
@@ -49,36 +42,12 @@ impl Endpoint for Blockstream {
         }
         Ok(blockchain)
     }
-    fn available(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        let diff = now - self.endpoint.last_request;
-        if diff < self.endpoint.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
-            debug!("Rate limit reached for {} ({}s)", self.endpoint.url, diff);
-            return false;
-        }
-        true
-    }
 }
 
 impl Blockstream {
     pub fn new(endpoint: configuration::Endpoint) -> Blockstream {
         Blockstream { endpoint }
     }
-    fn set_last_request(&mut self) {
-        trace!(
-            "Set last request for {} to {}",
-            self.endpoint.url,
-            self.endpoint.last_request
-        );
-        self.endpoint.last_request = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-    }
-    // get_block return last 10 blocks
     async fn get_blocks_from_height(
         &self,
         height: u32,

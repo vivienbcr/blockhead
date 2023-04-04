@@ -77,6 +77,7 @@ impl ReqwestClient {
         for i in 0..self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY) {
             let response = self.client.get(&url).send().await;
             if response.is_err() {
+
                 debug!(
                     "Error: GET {} request error, retrying in {} seconds, tries {} on {} ",
                     url,

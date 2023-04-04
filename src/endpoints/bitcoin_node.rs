@@ -1,26 +1,23 @@
+use super::ProviderActions;
 use crate::commons::blockchain;
-use crate::configuration::{self};
+use crate::configuration::{self, EndpointActions};
 use crate::requests::rpc::{JsonRpcBody, JsonRpcParams, JsonRpcResponse};
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
-use super::Endpoint;
 
 const JSON_RPC_VER: &str = "2.0";
-#[derive(Deserialize, Serialize,Debug,Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BitcoinNode {
-    endpoint: configuration::Endpoint,
+    pub endpoint: configuration::Endpoint,
 }
 impl BitcoinNode {
-    pub fn new (endpoint: configuration::Endpoint) -> BitcoinNode {
-        BitcoinNode {
-            endpoint
-        }
+    pub fn new(endpoint: configuration::Endpoint) -> BitcoinNode {
+        BitcoinNode { endpoint }
     }
 }
 #[async_trait]
-impl Endpoint for BitcoinNode {
+impl ProviderActions for BitcoinNode {
     /* Bitcoin Rpc work like this:
     1. Get the best block hash
     2. Get the block
@@ -31,10 +28,7 @@ impl Endpoint for BitcoinNode {
         &mut self,
         n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(
-            configuration::ProtocolName::Bitcoin,
-            self.endpoint.network.clone(),
-        );
+        let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let bbh_res = self.get_best_block_hash().await;
         let best_block_hash = match bbh_res {
             Ok(hash) => hash,
@@ -66,31 +60,12 @@ impl Endpoint for BitcoinNode {
             return Err("Error: build blockchain is less than n_block".into());
         }
         blockchain.sort();
-        self.set_last_request();
+        self.endpoint.set_last_request();
         Ok(blockchain)
-    }
-    fn available(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        let diff = now - self.endpoint.last_request;
-        if diff < self.endpoint.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
-            debug!("Rate limit reached for {} ({}s)", self.endpoint.url, diff);
-            return false;
-        }
-        true
     }
 }
 
 impl BitcoinNode {
-    fn set_last_request(&mut self) {
-        trace!("Set last request for {} to {}", self.endpoint.url, self.endpoint.last_request);
-        self.endpoint.last_request = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-    }
     pub async fn get_blockchain_info(
         &self,
     ) -> Result<Getblockchaininfo, Box<dyn std::error::Error + Send + Sync>> {

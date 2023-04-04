@@ -39,10 +39,10 @@ protocols:
           rate: 10
       blockstream:
         url: https://sample.bitcoin.mainnet.blockstream.api
-  ## Other options not implemented yet
-  #     blockcypher:
-  #       url: https://sample.bitcoin.mainnet.blockcypher.api
-  #       token: xxxxxxx
+      blockcypher:
+        url: https://api.blockcypher.com
+        options:
+          rate: 360
   #       options:
   #         retry: 10
   #         delay: 1

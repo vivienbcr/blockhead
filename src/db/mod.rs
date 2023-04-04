@@ -2,9 +2,8 @@ use std::error::Error;
 
 use once_cell::sync::OnceCell;
 use redb::{Database, ReadableTable, TableDefinition};
-use serde::Deserialize;
-use std::{io, panic};
-use tokio::sync::oneshot::error;
+
+use std::io;
 
 use crate::{
     commons::blockchain::{self, Block},
@@ -18,11 +17,11 @@ pub struct Redb {
 }
 impl Redb {
     pub fn init() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        println!("Redb::new()");
+        debug!("Redb::new");
         let db = Database::open("bh_db.redb");
         match db {
             Ok(db) => {
-                println!("Redb::new() db is ok");
+                info!("Redb::new() db is ok");
                 let db = db;
                 DATABASE.set(Redb { db: db }).unwrap();
                 Ok(())
@@ -95,7 +94,7 @@ impl Redb {
                 return Ok(blockchain);
             }
             None => {
-                error!("Redb get_blockchain return None");
+                debug!("Redb get_blockchain return an empty response.");
                 return Err("Error: Reddb return None".into());
             }
         }
@@ -109,24 +108,29 @@ impl Redb {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb set_blockchain({:?},{:?})", protocol, network);
         let chain_db = self.get_blockchain(&protocol, &network);
-        let mut chain_db = match chain_db {
+        let chain_db = match chain_db {
             Ok(data) => data,
             Err(e) => {
                 error!(
                     "Redb get_blockchain return an error {:?} init empty blockchain",
                     e
                 );
-                blockchain::Blockchain::new(protocol.clone(), network.clone())
+                blockchain::Blockchain::new(None)
             }
         };
-        if chain_db.height == blockchain.height {
+        if chain_db.height == blockchain.height || chain_db.height > blockchain.height {
             debug!("Redb set_blockchain: same height, do nothing");
             return Ok(());
         }
+        debug!(
+            "Detect new chain height {} vs {}, updating database.",
+            chain_db.height, blockchain.height
+        );
 
         let keep = CONFIGURATION.get().unwrap().database.keep_history;
 
-        let mut merged_blocks: Vec<Block> = chain_db.blocks
+        let mut merged_blocks: Vec<Block> = chain_db
+            .blocks
             .clone()
             .into_iter()
             .chain(blockchain.blocks.clone().into_iter())
@@ -135,13 +139,10 @@ impl Redb {
                 if !acc.iter().any(|block: &Block| block.height == b.height) {
                     trace!("Add block {}", b.height);
                     acc.push(b);
-                }else{
+                } else {
                     // by using chain on param blockchain at second arg, we ensure blockchain param have priority and will replace the block in db
                     if let Some(idx) = acc.iter().position(|block| block.height == b.height) {
-                        trace!(
-                            "Replace block {} with {}",
-                            acc[idx].height, b.height
-                        );
+                        trace!("Replace block {} with {}", acc[idx].height, b.height);
                         acc[idx] = b;
                     }
                 }
@@ -162,18 +163,3 @@ impl Redb {
         Ok(())
     }
 }
-
-/*  bitcoin {
-    mainnet : {
-        last_update :
-        blocks : [
-            {
-                hash :
-                height :
-                time :
-                txs :
-            }
-        ]
-    }
-}
-*/

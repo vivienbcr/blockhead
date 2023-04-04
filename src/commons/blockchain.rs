@@ -13,16 +13,16 @@ pub struct Block {
 pub struct Blockchain {
     pub blocks: Vec<Block>,
     pub height: u64,
-    // pub protocol: String,
-    // pub network: String,
 }
 impl Blockchain {
-    pub fn new(protocol: ProtocolName, network: NetworkName) -> Blockchain {
+    pub fn new(blocks: Option<Vec<Block>>) -> Blockchain {
+        let b = match blocks {
+            Some(b) => b,
+            None => Vec::new(),
+        };
         Blockchain {
-            blocks: Vec::new(),
+            blocks: b,
             height: 0,
-            // protocol: protocol.to_string(),
-            // network: network.to_string(),
         }
     }
     pub fn add_block(&mut self, block: Block) {
@@ -31,7 +31,7 @@ impl Blockchain {
         }
         self.blocks.push(block);
     }
-    pub fn sort(&mut self){
+    pub fn sort(&mut self) {
         if self.blocks.len() == 0 {
             return;
         }
@@ -39,7 +39,6 @@ impl Blockchain {
         if self.blocks.len() > 0 {
             self.height = self.blocks.first().unwrap().height;
         }
-
     }
 }
 
