@@ -1,17 +1,19 @@
-use serde::{Deserialize, Serialize};
 use super::client::ReqwestClient;
-use crate::{prom::registry::track_status_code, configuration};
+use crate::{
+    configuration, prom::registry::track_response_time, prom::registry::track_status_code,
+};
+use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct JsonRpcResponse<T>{
+pub struct JsonRpcResponse<T> {
     pub jsonrpc: String,
     pub id: Option<u32>,
     pub result: Option<T>,
     pub error: Option<String>,
 }
-#[derive( Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub enum JsonRpcParams {
-    String (String),
-    Number (u32),
+    String(String),
+    Number(u32),
 }
 impl Serialize for JsonRpcParams {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -32,21 +34,36 @@ pub struct JsonRpcBody {
     pub params: Vec<JsonRpcParams>,
 }
 impl ReqwestClient {
-    pub async fn rpc(&self, body: &JsonRpcBody, protocol : &str, network: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn rpc(
+        &self,
+        body: &JsonRpcBody,
+        protocol: &str,
+        network: &str,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let url = self.config.url.clone().unwrap().clone();
-        for i in 0..self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY) {
+        for i in 0..self
+            .config
+            .retry
+            .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+        {
+            let time_start = std::time::Instant::now();
             let response = self
-            .client
-            .post(&url)
-            .body(serde_json::to_string(&body).unwrap())
-            .send()
-            .await;
+                .client
+                .post(&url)
+                .body(serde_json::to_string(&body).unwrap())
+                .send()
+                .await;
+            let time_duration = time_start.elapsed().as_secs_f64();
             if response.is_err() {
                 debug!(
                     "Error: rpc request error, retrying in {} seconds, tries {} on {} ",
-                    self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                    self.config
+                        .rate
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                    self.config
+                        .retry
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
@@ -54,57 +71,95 @@ impl ReqwestClient {
             let response = response.unwrap();
             let status = response.status().as_u16();
             // TODO: in case of 429, we should implement exponential backoff
-            track_status_code(&url, "POST",status, protocol, network );
+            track_status_code(&url, "POST", status, protocol, network);
             if status != 200 {
                 debug!(
                     "Error: RPC {} status code {}, retrying in {} seconds, tries {} on {} ",
                     url,
                     status,
-                    self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                    self.config
+                        .rate
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                    self.config
+                        .retry
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
             }
+            track_response_time(&url, "POST", protocol, network, time_duration);
             return Ok(response.text().await?);
         }
-        return Err(format!("Error: RPC {} fail after {} retry",url,self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)).into());
+        return Err(format!(
+            "Error: RPC {} fail after {} retry",
+            url,
+            self.config
+                .rate
+                .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+        )
+        .into());
     }
 
-    pub async fn get(&self, url: &str,protocol : &str, network: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn get(
+        &self,
+        url: &str,
+        protocol: &str,
+        network: &str,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let url = url.to_string();
-        for i in 0..self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY) {
+        for i in 0..self
+            .config
+            .retry
+            .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+        {
+            let time_start = std::time::Instant::now();
             let response = self.client.get(&url).send().await;
+            let time_duration = time_start.elapsed().as_secs_f64();
             if response.is_err() {
-
                 debug!(
                     "Error: GET {} request error, retrying in {} seconds, tries {} on {} ",
                     url,
-                    self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                    self.config
+                        .rate
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                    self.config
+                        .retry
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
             }
             let response = response.unwrap();
             let status = response.status().as_u16();
-            track_status_code(&url, "GET",status, protocol, network);
+            track_status_code(&url, "GET", status, protocol, network);
             if status != 200 {
                 debug!(
                     "Error: GET {} status code {}, retrying in {} seconds, tries {} on {} ",
                     url,
                     status,
-                    self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                    self.config
+                        .rate
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config.retry.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                    self.config
+                        .retry
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
             }
+            track_response_time(&url, "GET", protocol, network, time_duration);
             return Ok(response.text().await?);
         }
-        return Err(format!("Error: GET {} fail after {} retry",url,self.config.rate.unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)).into());
+        return Err(format!(
+            "Error: GET {} fail after {} retry",
+            url,
+            self.config
+                .rate
+                .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+        )
+        .into());
     }
 }

@@ -1,6 +1,6 @@
 use actix_web::{get, HttpResponse, Responder};
 
-#[get("/")]
+#[get("/metrics")]
 async fn prometheus_handler() -> impl Responder {
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();

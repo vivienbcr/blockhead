@@ -1,2 +1,2 @@
-pub mod registry;
 pub mod metrics;
+pub mod registry;

@@ -12,11 +12,9 @@ static REGISTRY: Lazy<Mutex<Registry>> = Lazy::new(|| Mutex::new(Registry::new()
 //TODO: Monitor response time for each endpoint
 pub fn register_custom_metrics() {
     let r = REGISTRY.lock().unwrap();
-    r.register(Box::new(metrics::HTTP_REQUEST_CODE_200.clone()))
+    r.register(Box::new(metrics::HTTP_REQUEST_CODE.clone()))
         .expect("collector can be registered");
-    r.register(Box::new(metrics::HTTP_REQUEST_CODE_400.clone()))
-        .expect("collector can be registered");
-    r.register(Box::new(metrics::HTTP_REQUEST_CODE_500.clone()))
+    r.register(Box::new(metrics::ENDPOINT_RESPONSE_TIME.clone()))
         .expect("collector can be registered");
     r.register(Box::new(metrics::BLOCKCHAIN_HEIGHT.clone()))
         .expect("collector can be registered");
@@ -25,8 +23,8 @@ pub fn register_custom_metrics() {
     r.register(Box::new(metrics::BLOCKCHAIN_HEAD_TXS.clone()))
         .expect("collector can be registered");
 }
-pub fn track_status_code(url: &str,method : &str, status_code: u16, protocol: &str, network: &str) {
-   // retain only https://domain.tld
+pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &str, network: &str) {
+    // retain only https://domain.tld
     let base_domain = url
         .split('/')
         .nth(2)
@@ -34,18 +32,31 @@ pub fn track_status_code(url: &str,method : &str, status_code: u16, protocol: &s
         .split(':')
         .nth(0)
         .unwrap_or("unknown");
-    match status_code {
-        500..=599 => metrics::HTTP_REQUEST_CODE_500
-            .with_label_values(&[base_domain,method, protocol, network])
-            .inc(),
-        400..=499 => metrics::HTTP_REQUEST_CODE_400
-            .with_label_values(&[base_domain,method, protocol, network])
-            .inc(),
-        200..=299 => metrics::HTTP_REQUEST_CODE_200
-            .with_label_values(&[base_domain,method, protocol, network])
-            .inc(),
-        _ => (),
-    };
+
+    metrics::HTTP_REQUEST_CODE
+        .with_label_values(&[
+            base_domain,
+            &status_code.to_string(),
+            method,
+            protocol,
+            network,
+        ])
+        .inc();
+}
+
+pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &str, time: f64) {
+    info!("Observe {:?}", time);
+    // retain only https://domain.tld
+    let base_domain = url
+        .split('/')
+        .nth(2)
+        .unwrap_or("unknown")
+        .split(':')
+        .nth(0)
+        .unwrap_or("unknown");
+    metrics::ENDPOINT_RESPONSE_TIME
+        .with_label_values(&[base_domain, method, protocol, network])
+        .observe(time);
 }
 
 pub fn set_blockchain_metrics(

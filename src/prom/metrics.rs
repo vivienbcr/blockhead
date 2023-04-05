@@ -1,30 +1,25 @@
 use once_cell::sync::Lazy;
-use prometheus::{register_int_counter_vec, register_int_gauge_vec, IntCounterVec, IntGaugeVec};
+use prometheus::{
+    register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramVec,
+    IntCounterVec, IntGaugeVec,
+};
 
 /**
  * HTTP request metrics
  */
-pub static HTTP_REQUEST_CODE_200: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static HTTP_REQUEST_CODE: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "http_request_code_200",
-        "http request returns code 200",
-        &["base_url","method", "proto", "network"]
+        "http_request_code",
+        "http request returns code",
+        &["base_url", "status_code", "method", "proto", "network"]
     )
     .expect("metric can be created")
 });
-pub static HTTP_REQUEST_CODE_400: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "http_request_code_400",
-        "http request returns code 400",
-        &["base_url","method", "proto", "network"]
-    )
-    .expect("metric can be created")
-});
-pub static HTTP_REQUEST_CODE_500: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!(
-        "http_request_code_500",
-        "http request returns code 500",
-        &["base_url","method", "proto", "network"]
+pub static ENDPOINT_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "endpoint_response_time_seconds",
+        "Time to get response from endpoint in second",
+        &["base_url", "method", "proto", "network"]
     )
     .expect("metric can be created")
 });
