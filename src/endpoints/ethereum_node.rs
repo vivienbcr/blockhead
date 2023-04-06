@@ -1,11 +1,10 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
-use crate::configuration::{self, EndpointActions};
+use crate::configuration::{self};
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct EthereumNode {
