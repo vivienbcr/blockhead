@@ -3,6 +3,7 @@ use crate::{
     configuration, prom::registry::track_response_time, prom::registry::track_status_code,
 };
 use serde::{Deserialize, Serialize};
+pub const JSON_RPC_VER: &str = "2.0";
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonRpcResponse<T> {
     pub jsonrpc: String,
@@ -14,6 +15,7 @@ pub struct JsonRpcResponse<T> {
 pub enum JsonRpcParams {
     String(String),
     Number(u32),
+    Bool(bool),
 }
 impl Serialize for JsonRpcParams {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -23,23 +25,44 @@ impl Serialize for JsonRpcParams {
         match self {
             JsonRpcParams::String(s) => serializer.serialize_str(s),
             JsonRpcParams::Number(n) => serializer.serialize_u32(*n),
+            JsonRpcParams::Bool(b) => serializer.serialize_bool(*b),
         }
     }
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct JsonRpcBody {
+pub struct JsonRpcReq {
     pub jsonrpc: String,
     pub id: u32,
     pub method: String,
     pub params: Vec<JsonRpcParams>,
 }
+#[derive(Deserialize, Debug, Clone)]
+pub enum JsonRpcReqBody {
+    Single(JsonRpcReq),
+    Batch(Vec<JsonRpcReq>),
+}
+// implement custom serialization for JsonRpcReqBody
+impl Serialize for JsonRpcReqBody {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            JsonRpcReqBody::Single(req) => req.serialize(serializer),
+            JsonRpcReqBody::Batch(reqs) => reqs.serialize(serializer),
+        }
+    }
+}
+
 impl ReqwestClient {
     pub async fn rpc(
         &self,
-        body: &JsonRpcBody,
+        body: &JsonRpcReqBody,
         protocol: &str,
         network: &str,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        let b = serde_json::to_string(&body).unwrap();
+        debug!("RPC request: {}", &b);
         let url = self.config.url.clone().unwrap().clone();
         for i in 0..self
             .config
@@ -50,13 +73,15 @@ impl ReqwestClient {
             let response = self
                 .client
                 .post(&url)
-                .body(serde_json::to_string(&body).unwrap())
+                .body(b.clone())
+                .header("Content-Type", "application/json")
                 .send()
                 .await;
             let time_duration = time_start.elapsed().as_secs_f64();
             if response.is_err() {
                 debug!(
-                    "Error: rpc request error, retrying in {} seconds, tries {} on {} ",
+                    "Error: rpc request {} error, retrying in {} seconds, tries {} on {} ",
+                    &b,
                     self.config
                         .rate
                         .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
@@ -70,11 +95,10 @@ impl ReqwestClient {
             }
             let response = response.unwrap();
             let status = response.status().as_u16();
-            // TODO: in case of 429, we should implement exponential backoff
             track_status_code(&url, "POST", status, protocol, network);
             if status != 200 {
                 debug!(
-                    "Error: RPC {} status code {}, retrying in {} seconds, tries {} on {} ",
+                    "Error: RPC {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
                     url,
                     status,
                     self.config
@@ -83,12 +107,14 @@ impl ReqwestClient {
                     i,
                     self.config
                         .retry
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY),
+                    &b
                 );
                 self.iddle().await;
                 continue;
             }
             track_response_time(&url, "POST", protocol, network, time_duration);
+            debug!("RPC {} OK", url);
             return Ok(response.text().await?);
         }
         return Err(format!(

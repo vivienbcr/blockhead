@@ -1,12 +1,13 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
-use crate::configuration::{self, EndpointActions};
-use crate::requests::rpc::{JsonRpcBody, JsonRpcParams, JsonRpcResponse};
+use crate::configuration::{self, EndpointActions, NetworkName};
+use crate::requests::rpc::{
+    JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
+};
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-const JSON_RPC_VER: &str = "2.0";
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BitcoinNode {
     pub endpoint: configuration::Endpoint,
@@ -14,6 +15,11 @@ pub struct BitcoinNode {
 impl BitcoinNode {
     pub fn new(endpoint: configuration::Endpoint) -> BitcoinNode {
         BitcoinNode { endpoint }
+    }
+    pub fn test_new(url: &str, net: NetworkName) -> Self {
+        BitcoinNode {
+            endpoint: configuration::Endpoint::test_new(url, net),
+        }
     }
 }
 #[async_trait]
@@ -70,12 +76,12 @@ impl BitcoinNode {
         &self,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get best block hash for {}", self.endpoint.url);
-        let body = JsonRpcBody {
+        let body = JsonRpcReqBody::Single(JsonRpcReq {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
             method: "getbestblockhash".to_string(),
             params: vec![],
-        };
+        });
         self.run_request(&body).await
     }
     pub async fn get_block(
@@ -83,7 +89,7 @@ impl BitcoinNode {
         hash: &str,
     ) -> Result<Getblock, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get block for {}", self.endpoint.url);
-        let body = JsonRpcBody {
+        let body = JsonRpcReqBody::Single(JsonRpcReq {
             jsonrpc: JSON_RPC_VER.to_string(),
             id: 1,
             method: "getblock".to_string(),
@@ -91,13 +97,13 @@ impl BitcoinNode {
                 JsonRpcParams::String(hash.to_string()),
                 JsonRpcParams::Number(1),
             ],
-        };
+        });
         self.run_request(&body).await
     }
 
     async fn run_request<T: DeserializeOwned>(
         &self,
-        body: &JsonRpcBody,
+        body: &JsonRpcReqBody,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Run for {}", self.endpoint.url);
         let reqwest = self.endpoint.reqwest.as_ref().unwrap();
@@ -164,4 +170,47 @@ pub struct BIP9 {
     pub timeout: i64,
     pub since: i64,
     pub min_activation_height: i64,
+}
+
+#[cfg(test)]
+
+mod test {
+    extern crate env_logger;
+    use super::*;
+    use crate::tests;
+    use std::env;
+
+    #[tokio::test]
+    async fn test_get_best_block_hash() {
+        tests::setup();
+        let url = env::var("BITCOIN_RPC_URL").unwrap();
+        let bitcoin_node = BitcoinNode::test_new(url.as_str(), NetworkName::Mainnet);
+        let res = bitcoin_node.get_best_block_hash().await;
+        assert!(
+            res.is_ok(),
+            "get_best_block_hash returned error: {}, expected OK",
+            res.err().unwrap()
+        );
+        assert!(res.unwrap().len() > 0)
+    }
+    #[tokio::test]
+    async fn test_get_block() {
+        tests::setup();
+        let url = env::var("BITCOIN_RPC_URL").unwrap();
+        let bitcoin_node = BitcoinNode::test_new(url.as_str(), NetworkName::Mainnet);
+        let res = bitcoin_node
+            .get_block(&"00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce")
+            .await;
+        assert!(
+            res.is_ok(),
+            "get_block returned error: {}, expected OK",
+            res.err().unwrap()
+        );
+        let res = res.unwrap();
+        assert_eq!(
+            &res.hash, "00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce",
+            "get_block returned wrong hash {}, expected {}",
+            &res.hash, "00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce"
+        );
+    }
 }

@@ -157,18 +157,14 @@ pub struct BlockResponse {
 // log all info and print to stdout
 mod tests {
     extern crate env_logger;
+    use std::env;
+
     use super::*;
-    // use std::{println as info, println as warn, println as debug};
-    fn init() {
-        let _ = env_logger::builder()
-            .is_test(true)
-            .filter(Some("blockhead"), log::LevelFilter::Trace)
-            .try_init();
-    }
+    use crate::tests;
 
     #[tokio::test]
     async fn test_get_chain_height() {
-        init();
+        tests::setup();
         let mut blockcypher =
             Blockcypher::test_new("https://api.blockcypher.com", NetworkName::Mainnet);
         let res = blockcypher.get_chain_height().await.unwrap();
@@ -177,11 +173,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_blocks_from_height() {
-        init();
+        tests::setup();
         let n_block = 10;
         let height = 100;
-        let mut blockcypher =
-            Blockcypher::test_new("https://api.blockcypher.com", NetworkName::Mainnet);
+        let mut blockcypher = Blockcypher::test_new(
+            &env::var("BLOCKCYPHER_API_URL").unwrap(),
+            NetworkName::Mainnet,
+        );
         let res = blockcypher
             .get_blocks_from_height(height, n_block)
             .await

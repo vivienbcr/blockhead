@@ -2,3 +2,4 @@
 *.json
 config.yaml
 bh.redb
+.test.env

@@ -7,6 +7,9 @@ pub mod db;
 pub mod endpoints;
 pub mod prom;
 pub mod requests;
+#[cfg(test)]
+pub mod tests;
+
 use crate::{
     api::{app, metrics},
     collectors::bitcoin,

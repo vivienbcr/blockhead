@@ -45,7 +45,6 @@ pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &s
 }
 
 pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &str, time: f64) {
-    info!("Observe {:?}", time);
     // retain only https://domain.tld
     let base_domain = url
         .split('/')

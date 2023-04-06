@@ -1,8 +1,9 @@
+use crate::commons::blockchain;
+use async_trait::async_trait;
 pub mod bitcoin_node;
 pub mod blockcypher;
 pub mod blockstream;
-use crate::commons::blockchain;
-use async_trait::async_trait;
+pub mod ethereum_node;
 
 #[async_trait]
 pub trait ProviderActions {
