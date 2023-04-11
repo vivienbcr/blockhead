@@ -6,10 +6,7 @@ use std::{
 
 use config::{self, ConfigError, File};
 use once_cell::sync::OnceCell;
-use serde::{
-    de::{DeserializeOwned, Error},
-    Deserialize, Deserializer, Serialize,
-};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::{
