@@ -113,9 +113,12 @@ impl ReqwestClient {
                 self.iddle().await;
                 continue;
             }
+            trace!("RPC {} response: {:?}", url, response);
+            let txt = response.text().await;
+            trace!("RPC {} response text: {:?}", url, txt);
             track_response_time(&url, "POST", protocol, network, time_duration);
             debug!("RPC {} OK", url);
-            return Ok(response.text().await?);
+            return Ok(txt?);
         }
         return Err(format!(
             "Error: RPC {} fail after {} retry",

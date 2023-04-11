@@ -1,13 +1,15 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
-use crate::configuration::{self, EndpointActions, NetworkName};
+
+#[cfg(test)]
+use crate::configuration::NetworkName;
+use crate::configuration::{self, EndpointActions};
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BitcoinNode {
     pub endpoint: configuration::Endpoint,
@@ -16,6 +18,7 @@ impl BitcoinNode {
     pub fn new(endpoint: configuration::Endpoint) -> BitcoinNode {
         BitcoinNode { endpoint }
     }
+    #[cfg(test)]
     pub fn test_new(url: &str, net: NetworkName) -> Self {
         BitcoinNode {
             endpoint: configuration::Endpoint::test_new(url, net),
@@ -35,7 +38,9 @@ impl ProviderActions for BitcoinNode {
         n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
+
         let bbh_res = self.get_best_block_hash().await;
+
         let best_block_hash = match bbh_res {
             Ok(hash) => hash,
             Err(e) => {

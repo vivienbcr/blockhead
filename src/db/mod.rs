@@ -118,7 +118,7 @@ impl Redb {
                 blockchain::Blockchain::new(None)
             }
         };
-        if chain_db.height == blockchain.height || chain_db.height > blockchain.height {
+        if (chain_db.height == blockchain.height) || chain_db.height > blockchain.height {
             debug!("Redb set_blockchain: same height, do nothing");
             return Ok(());
         }

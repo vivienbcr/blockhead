@@ -1,6 +1,6 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
-use crate::configuration::{self};
+use crate::configuration::{self, EndpointActions};
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
@@ -18,7 +18,6 @@ impl ProviderActions for EthereumNode {
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let head = self.get_block_by_number(None, false).await?.pop().unwrap();
-
         let mut block_numbers = Vec::new();
         for i in 0..n_block {
             block_numbers.push(head.number - i as u64);
@@ -34,6 +33,8 @@ impl ProviderActions for EthereumNode {
                 txs: block.transactions.len() as u64,
             });
         }
+        blockchain.sort();
+        self.endpoint.set_last_request();
         Ok(blockchain)
     }
 }
@@ -99,7 +100,31 @@ impl EthereumNode {
                 }
                 JsonRpcReqBody::Batch(_) => {
                     let rpc_res: Vec<JsonRpcResponse<Block>> = serde_json::from_str(&res)?;
-                    let res = rpc_res.into_iter().map(|r| r.result.unwrap()).collect();
+                    let contain_err = rpc_res.iter().any(|r| {
+                        if r.error.is_some() || r.result.is_none() {
+                            return true;
+                        };
+                        false
+                    });
+                    if contain_err {
+                        error!(
+                            "Error in batch response: {:?}",
+                            rpc_res
+                                .iter()
+                                .filter(|r| r.error.is_some())
+                                .collect::<Vec<_>>()
+                        );
+                        return Err("Error in batch response".into());
+                    }
+                    let res = rpc_res
+                        .into_iter()
+                        .map(|r| {
+                            trace!("batch block: {:?}", r);
+                            // catch case where result is empty, if so, return Err
+
+                            r.result.unwrap()
+                        })
+                        .collect();
                     Ok(res)
                 }
             },

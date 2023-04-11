@@ -12,7 +12,7 @@ pub mod tests;
 
 use crate::{
     api::{app, metrics},
-    collectors::bitcoin,
+    collectors::{bitcoin, ethereum},
     prom::registry::register_custom_metrics,
 };
 use db::Redb;
@@ -48,6 +48,7 @@ async fn main() -> std::io::Result<()> {
             std::process::exit(1);
         }
     };
+
     register_custom_metrics();
 
     config.protocols.iter().for_each(|protocol| {
@@ -68,12 +69,26 @@ async fn main() -> std::io::Result<()> {
                 })
             }
             configuration::ProtocolName::Ethereum => {
-                info!("Ethereum collector not implemented yet");
+                info!("Ethereum endpoints detected... ");
+                map_networks.iter().for_each(|map_network| {
+                    let network = map_network.0.clone();
+                    let endpoints = map_network.1.clone(); // At this point, ProtocolsOpts is only BitcoinOpts
+                    match &endpoints {
+                        configuration::ProtocolsOpts::Ethereum(endpoints) => {
+                            tokio::task::spawn(ethereum::ethereum(network, endpoints.clone()));
+                        }
+                        _ => {}
+                    }
+                })
             }
             _ => {}
         }
     });
-
+    let default_panic = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default_panic(info);
+        std::process::exit(1);
+    }));
     let metrics_port = config.global.metrics.port;
     let server_port = config.global.server.port;
     info!(

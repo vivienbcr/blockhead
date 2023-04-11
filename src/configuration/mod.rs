@@ -6,16 +6,23 @@ use std::{
 
 use config::{self, ConfigError, File};
 use once_cell::sync::OnceCell;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{
+    de::{DeserializeOwned, Error},
+    Deserialize, Deserializer, Serialize,
+};
 use serde_json::Value;
 
 use crate::{
-    endpoints::{bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream},
+    endpoints::{
+        bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream,
+        ethereum_node::EthereumNode,
+    },
     requests::client::ReqwestClient,
 };
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
+pub static CONFIGURATION_GLOB_NETWORK_OPTION: OnceCell<NetworkOptions> = OnceCell::new();
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Database {
     pub keep_history: u32,
@@ -30,7 +37,10 @@ pub struct Configuration {
     #[serde(skip)]
     pub enabled_proto_net: HashMap<ProtocolName, Vec<NetworkName>>,
 }
-// Deserialize configuration should be used to be sure global configuration will be deserialized first
+/**
+ * Deserialize configuration is used to be sure global configuration will be deserialized first
+ * global configuration set some default values wich endpoint will reuse at their initialization
+ */
 impl<'de> Deserialize<'de> for Configuration {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -73,7 +83,7 @@ where
             let k = NetworkName::from_str(k).unwrap();
             match proto_k {
                 ProtocolName::Bitcoin => {
-                    debug!("deserialize bitcoin {:?}", v);
+                    debug!("Deserialize Bitcoin options {:?}", v);
                     let mut bitcoin_opts = BitcoinOpts::default();
                     for (endpoint_param_name, endpoint_obj) in v.as_object().unwrap() {
                         match endpoint_param_name.as_str() {
@@ -110,7 +120,11 @@ where
                                         bitcoin_opts.blockcypher = Some(blockcypher);
                                     }
                                     _ => {
-                                        error!("endpoint_param_name: {:?}", endpoint_param_name);
+                                        error!(
+                                            "Unknown Bitcoin endpoint : {:?}",
+                                            endpoint_param_name
+                                        );
+                                        panic!("Bitcoin endpoint configuration contain unknown option : {:?}", endpoint_param_name)
                                     }
                                 }
                             }
@@ -122,10 +136,47 @@ where
                         .insert(k, ProtocolsOpts::Bitcoin(bitcoin_opts));
                 }
                 ProtocolName::Ethereum => {
-                    let endpoints = EthereumEndpoints::deserialize(v).unwrap();
+                    debug!("Deserialize Ethereum options {:?}", v);
+                    //FIXME: Should find way to don't repeat code for each proto but.. VOILA
+                    let mut ethereum_opts = EthereumOpts::default();
+                    for (endpoint_param_name, endpoint_obj) in v.as_object().unwrap() {
+                        match endpoint_param_name.as_str() {
+                            "network_options" => {
+                                let network_opts =
+                                    NetworkOptions::deserialize(endpoint_obj).unwrap();
+                                info!("Ethereum network options : {:?}", network_opts);
+                                ethereum_opts.network_options = Some(network_opts);
+                            }
+                            "rpc" => {
+                                let rpc_endpts: Vec<Endpoint> =
+                                    serde_json::from_str(&endpoint_obj.to_string()).unwrap();
+                                let ethereum_nodes = rpc_endpts
+                                    .iter()
+                                    .map(|e| {
+                                        let mut e = e.clone();
+                                        e.network = k.clone();
+                                        EthereumNode::new(e.clone())
+                                    })
+                                    .collect();
+                                ethereum_opts.rpc = Some(ethereum_nodes);
+                            }
+                            _ => {
+                                error!("Unknown Ethereum endpoint : {:?}", endpoint_param_name);
+                                panic!(
+                                    "Ethereum endpoint configuration contain unknown option : {:?}",
+                                    endpoint_param_name
+                                )
+                            }
+                        }
+                    }
+                    ethereum_opts.network_options = match ethereum_opts.network_options {
+                        Some(e) => Some(e),
+                        None => Some(NetworkOptions::default()),
+                    };
+
                     map.entry(proto_k.clone())
                         .or_insert(HashMap::new())
-                        .insert(k, ProtocolsOpts::Ethereum(endpoints));
+                        .insert(k, ProtocolsOpts::Ethereum(ethereum_opts));
                 }
                 ProtocolName::Tezos => {
                     let endpoints = TezosEndpoints::deserialize(v).unwrap();
@@ -143,10 +194,12 @@ where
 pub struct Global {
     #[serde(deserialize_with = "deserialize_global_endpoint_options")]
     pub endpoints: EndpointOptions,
+    #[serde(deserialize_with = "deserialize_global_network_options")]
+    pub networks_options: NetworkOptions,
     pub metrics: Metrics,
     pub server: Server,
-    pub networks_options: NetworkOptions,
 }
+// deserialize_global_endpoint_options
 // Little trick to init global endpoint options, this Global will be used in the rest of deserialization process to init request client
 fn deserialize_global_endpoint_options<'de, D>(deserializer: D) -> Result<EndpointOptions, D::Error>
 where
@@ -162,6 +215,23 @@ where
         CONFIGURATION_GLOB_ENDPOINT_OPTION.get().unwrap()
     );
     Ok(endpoint_opt)
+}
+// deserialize_global_network_options
+// Little trick to init global network options, this Global will be used in the rest of deserialization process to init request client
+fn deserialize_global_network_options<'de, D>(deserializer: D) -> Result<NetworkOptions, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let network_opt = NetworkOptions::deserialize(deserializer).unwrap();
+    debug!("deserialize_global_network_options: {:?}", network_opt);
+    CONFIGURATION_GLOB_NETWORK_OPTION
+        .set(network_opt.clone())
+        .unwrap();
+    debug!(
+        "set CONFIGURATION_GLOB_NETWORK_OPTION: {:?}",
+        CONFIGURATION_GLOB_NETWORK_OPTION.get().unwrap()
+    );
+    Ok(network_opt)
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Metrics {
@@ -225,7 +295,10 @@ impl std::fmt::Display for NetworkName {
         }
     }
 }
-
+/*
+* get_enabled_protocol_network
+* Return a HashMap of enabled protocol and network
+*/
 pub fn get_enabled_protocol_network() -> HashMap<ProtocolName, Vec<NetworkName>> {
     let config = CONFIGURATION.get().unwrap();
     config.enabled_proto_net.clone()
@@ -281,25 +354,61 @@ impl FromStr for ProtocolName {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ProtocolsOpts {
     Bitcoin(BitcoinOpts),
-    Ethereum(EthereumEndpoints),
+    Ethereum(EthereumOpts),
     Tezos(TezosEndpoints),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct NetworkOptions {
     pub head_length: Option<u32>,
+    pub tick_rate: u32,
 }
-impl NetworkOptions {
-    pub fn init(&mut self) {
-        let global_config = CONFIGURATION.get().unwrap();
-        let global_networks_options = global_config.global.networks_options.clone();
-        if self.head_length.is_none() {
-            self.head_length = global_networks_options.head_length;
+impl<'de> Deserialize<'de> for NetworkOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut network_options = NetworkOptions::default();
+
+        let map = serde_json::Map::deserialize(deserializer)?;
+        error!("deserialize NetworkOptions {:?}", map);
+        for (key, value) in map {
+            match key.as_str() {
+                "head_length" => {
+                    network_options.head_length = Some(value.as_u64().unwrap() as u32);
+                }
+                "tick_rate" => {
+                    network_options.tick_rate = value.as_u64().unwrap() as u32;
+                }
+                _ => {
+                    return Err(serde::de::Error::custom(format!(
+                        "Unknown network option: {}",
+                        key
+                    )));
+                }
+            }
         }
+        info!("network_options: {:?}", network_options);
+
+        Ok(network_options)
     }
-    pub fn default() -> Self {
-        NetworkOptions {
-            head_length: Some(DEFAULT_HEAD_LENGTH),
+}
+
+impl Default for NetworkOptions {
+    fn default() -> Self {
+        trace!("default NetworkOptions");
+        match CONFIGURATION_GLOB_NETWORK_OPTION.get() {
+            Some(global_networks_opts) => {
+                let global_networks_options = global_networks_opts.clone();
+                NetworkOptions {
+                    head_length: global_networks_options.head_length,
+                    tick_rate: global_networks_options.tick_rate,
+                }
+            }
+            None => NetworkOptions {
+                head_length: Some(DEFAULT_HEAD_LENGTH),
+                tick_rate: DEFAULT_TICK_RATE,
+            },
         }
     }
 }
@@ -343,10 +452,10 @@ impl FromStr for BitcoinAvailableEndpoints {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct EthereumEndpoints {
-    pub rpc: Option<Vec<Endpoint>>,
-    pub infura: Option<Endpoint>,
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct EthereumOpts {
+    pub network_options: Option<NetworkOptions>,
+    pub rpc: Option<Vec<EthereumNode>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -415,6 +524,7 @@ impl<'de> Deserialize<'de> for Endpoint {
             .ok_or_else(|| serde::de::Error::custom("Invalid url"))?
             .to_string();
         let options = v.get("options");
+        error!("Options: {:?}", options);
         let options = match options {
             Some(options) => {
                 let mut options = serde_json::from_value::<EndpointOptions>(options.clone())
@@ -422,7 +532,11 @@ impl<'de> Deserialize<'de> for Endpoint {
                 options.init(Some(&url));
                 options
             }
-            None => EndpointOptions::default(),
+            None => {
+                let mut options = EndpointOptions::default();
+                options.init(Some(&url));
+                options
+            }
         };
 
         Ok(Endpoint {
@@ -482,6 +596,7 @@ impl Default for EndpointOptions {
 pub const DEFAULT_SERVER_PORT: u32 = 8080;
 pub const DEFAULT_METRICS_PORT: u16 = 8081;
 pub const DEFAULT_HEAD_LENGTH: u32 = 5;
+pub const DEFAULT_TICK_RATE: u32 = 5;
 pub const DEFAULT_ENDPOINT_RETRY: u32 = 3;
 pub const DEFAULT_ENDPOINT_DELAY: u32 = 1;
 pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
@@ -495,6 +610,7 @@ impl Configuration {
             .set_default("global.server.port", DEFAULT_SERVER_PORT)?
             .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
             .set_default("global.networks_options.head_length", DEFAULT_HEAD_LENGTH)?
+            .set_default("global.networks_options.tick_rate", DEFAULT_TICK_RATE)?
             .set_default("database.keep_history", DEFAULT_DATABASE_KEEP_HISTORY)?
             .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
             .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
