@@ -17,19 +17,13 @@ pub struct Blockstream {
 
 #[async_trait]
 impl ProviderActions for Blockstream {
-    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> Blockstream {
-        let endpoint = Endpoint {
-            url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
-            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
-            last_request: 0,
-        };
-        Blockstream { endpoint }
-    }
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.endpoint.available() {
+            return Err("Error: Endpoint not available".into());
+        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let mut height = self.get_chain_height().await?;
         let mut blocks = self.get_blocks_from_height(height).await?;
@@ -56,6 +50,15 @@ impl ProviderActions for Blockstream {
 }
 
 impl Blockstream {
+    pub fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> Blockstream {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            last_request: 0,
+        };
+        Blockstream { endpoint }
+    }
     async fn get_blocks_from_height(
         &self,
         height: u32,

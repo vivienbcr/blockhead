@@ -23,10 +23,7 @@ impl BitcoinNode {
             endpoint: configuration::Endpoint::test_new(url, net),
         }
     }
-}
-#[async_trait]
-impl ProviderActions for BitcoinNode {
-    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> BitcoinNode {
+    pub fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> BitcoinNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
@@ -35,6 +32,9 @@ impl ProviderActions for BitcoinNode {
         };
         BitcoinNode { endpoint }
     }
+}
+#[async_trait]
+impl ProviderActions for BitcoinNode {
     /* Bitcoin Rpc work like this:
     1. Get the best block hash
     2. Get the block
@@ -45,6 +45,9 @@ impl ProviderActions for BitcoinNode {
         &mut self,
         n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.endpoint.available() {
+            return Err("Error: Endpoint not available".into());
+        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
 
         let bbh_res = self.get_best_block_hash().await;

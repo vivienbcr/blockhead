@@ -14,19 +14,13 @@ pub struct EthereumNode {
 }
 #[async_trait]
 impl ProviderActions for EthereumNode {
-    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> EthereumNode {
-        let endpoint = Endpoint {
-            url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
-            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
-            last_request: 0,
-        };
-        EthereumNode { endpoint }
-    }
     async fn parse_top_blocks(
         &mut self,
         n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.endpoint.available() {
+            return Err("Error: Endpoint not available".into());
+        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let head = self.get_block_by_number(None, false).await?.pop().unwrap();
         let mut block_numbers = Vec::new();
@@ -51,6 +45,15 @@ impl ProviderActions for EthereumNode {
 }
 
 impl EthereumNode {
+    pub fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> EthereumNode {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            last_request: 0,
+        };
+        EthereumNode { endpoint }
+    }
     #[cfg(test)]
     pub fn test_new(url: &str, net: configuration::NetworkName) -> Self {
         EthereumNode {

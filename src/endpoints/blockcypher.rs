@@ -18,19 +18,13 @@ pub struct Blockcypher {
 
 #[async_trait]
 impl ProviderActions for Blockcypher {
-    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> Blockcypher {
-        let endpoint = Endpoint {
-            url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
-            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
-            last_request: 0,
-        };
-        Blockcypher { endpoint }
-    }
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.endpoint.available() {
+            return Err("Error: Endpoint not available".into());
+        }
         let height = self.get_chain_height().await?;
         let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
@@ -42,6 +36,16 @@ impl ProviderActions for Blockcypher {
 }
 
 impl Blockcypher {
+    pub fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> Blockcypher {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            last_request: 0,
+        };
+        Blockcypher { endpoint }
+    }
+    #[cfg(test)]
     pub fn test_new(url: &str, net: NetworkName) -> Self {
         Blockcypher {
             endpoint: configuration::Endpoint::test_new(url, net),

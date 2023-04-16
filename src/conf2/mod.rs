@@ -13,15 +13,15 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
-pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
-pub static CONFIGURATION_GLOB_NETWORK_OPTION: OnceCell<NetworkAppOptions> = OnceCell::new();
+// pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
+// pub static CONFIGURATION_GLOB_NETWORK_OPTION: OnceCell<NetworkAppOptions> = OnceCell::new();
 type NetworkProvider = HashMap<Network2, Vec<Provider>>;
 type NetworkOptions = HashMap<Network2, NetworkAppOptions>;
-type ProtoNetworkOpts = HashMap<Protocol2, NetworkOptions>;
-type ProtoNetworkProvider = HashMap<Protocol2, NetworkProvider>;
+type ProtocolsNetworksOpts = HashMap<Protocol2, NetworkOptions>;
+type ProtocolsNetworksProviders = HashMap<Protocol2, NetworkProvider>;
 struct ProtoOptsProvider {
-    pub proto_opts: ProtoNetworkOpts,
-    pub proto_providers: ProtoNetworkProvider,
+    pub proto_opts: ProtocolsNetworksOpts,
+    pub proto_providers: ProtocolsNetworksProviders,
 }
 
 /**
@@ -31,9 +31,19 @@ struct ProtoOptsProvider {
 pub struct Configuration {
     pub global: Global,
     pub database: Database,
-    pub proto_opts: HashMap<Protocol2, HashMap<Network2, NetworkAppOptions>>,
-    pub proto_providers: HashMap<Protocol2, HashMap<Network2, Vec<Provider>>>,
+    pub proto_opts: ProtocolsNetworksOpts,
+    pub proto_providers: ProtocolsNetworksProviders,
 }
+impl Configuration {
+    pub fn get_network_options(
+        &self,
+        protocol: &Protocol2,
+        network: &Network2,
+    ) -> Option<&NetworkAppOptions> {
+        self.proto_opts.get(protocol)?.get(network)
+    }
+}
+
 /**
  * Deserialize configuration is used to be sure global configuration will be deserialized first
  * global configuration set some default values wich endpoint will reuse at their initialization
@@ -80,9 +90,9 @@ where
 {
     let v: Value = Deserialize::deserialize(deserializer)?;
     // proto_opts store network options for each protocol
-    let mut proto_opts: ProtoNetworkOpts = HashMap::new();
+    let mut proto_opts: ProtocolsNetworksOpts = HashMap::new();
     // proto_providers store providers for each protocol
-    let mut proto_providers: ProtoNetworkProvider = HashMap::new();
+    let mut proto_providers: ProtocolsNetworksProviders = HashMap::new();
     // Deserialize protocols
     v.as_object()
         .unwrap()
@@ -168,6 +178,12 @@ where
                     net_providers.insert(network.clone(), providers);
                 });
             });
+            // After deserialization, if user didn't specify network options we use global options
+            if net_opts.is_empty() {
+                let mut net_opt = global.networks_options.clone();
+                net_opts.insert(Network2::Mainnet, net_opt);
+            }
+
             proto_opts.insert(protocol.clone(), net_opts);
             proto_providers.insert(protocol.clone(), net_providers);
         });
@@ -181,9 +197,9 @@ where
  */
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Global {
-    #[serde(deserialize_with = "deserialize_global_endpoint_options")]
+    // #[serde(deserialize_with = "deserialize_global_endpoint_options")]
     pub endpoints: EndpointOptions,
-    #[serde(deserialize_with = "deserialize_global_network_options")]
+    // #[serde(deserialize_with = "deserialize_global_network_options")]
     pub networks_options: NetworkAppOptions,
     pub metrics: Metrics,
     pub server: Server,
@@ -191,41 +207,41 @@ pub struct Global {
 // deserialize_global_endpoint_options
 // Is used to init global endpoint options, this Global will be consider as default values for all endpoints
 // it should be deserialized first and set global to be reused by all endpoints deserialization and initialization
-fn deserialize_global_endpoint_options<'de, D>(deserializer: D) -> Result<EndpointOptions, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let endpoint_opt = EndpointOptions::deserialize(deserializer).unwrap();
-    debug!("deserialize_global_endpoint_options: {:?}", endpoint_opt);
-    CONFIGURATION_GLOB_ENDPOINT_OPTION
-        .set(endpoint_opt.clone())
-        .unwrap();
-    debug!(
-        "set CONFIGURATION_GLOB_ENDPOINT_OPTION: {:?}",
-        CONFIGURATION_GLOB_ENDPOINT_OPTION.get().unwrap()
-    );
-    Ok(endpoint_opt)
-}
+// fn deserialize_global_endpoint_options<'de, D>(deserializer: D) -> Result<EndpointOptions, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     let endpoint_opt = EndpointOptions::deserialize(deserializer).unwrap();
+//     debug!("deserialize_global_endpoint_options: {:?}", endpoint_opt);
+//     CONFIGURATION_GLOB_ENDPOINT_OPTION
+//         .set(endpoint_opt.clone())
+//         .unwrap();
+//     debug!(
+//         "set CONFIGURATION_GLOB_ENDPOINT_OPTION: {:?}",
+//         CONFIGURATION_GLOB_ENDPOINT_OPTION.get().unwrap()
+//     );
+//     Ok(endpoint_opt)
+// }
 // deserialize_global_network_options
 // Is used to init global network options, this Global will be consider as default values for all endpoints
 // it should be deserialized first and set global to be reused by all endpoints deserialization and initialization
-fn deserialize_global_network_options<'de, D>(
-    deserializer: D,
-) -> Result<NetworkAppOptions, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let network_opt = NetworkAppOptions::deserialize(deserializer).unwrap();
-    debug!("deserialize_global_network_options: {:?}", network_opt);
-    CONFIGURATION_GLOB_NETWORK_OPTION
-        .set(network_opt.clone())
-        .unwrap();
-    debug!(
-        "set CONFIGURATION_GLOB_NETWORK_OPTION: {:?}",
-        CONFIGURATION_GLOB_NETWORK_OPTION.get().unwrap()
-    );
-    Ok(network_opt)
-}
+// fn deserialize_global_network_options<'de, D>(
+//     deserializer: D,
+// ) -> Result<NetworkAppOptions, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     let network_opt = NetworkAppOptions::deserialize(deserializer).unwrap();
+//     debug!("deserialize_global_network_options: {:?}", network_opt);
+//     CONFIGURATION_GLOB_NETWORK_OPTION
+//         .set(network_opt.clone())
+//         .unwrap();
+//     debug!(
+//         "set CONFIGURATION_GLOB_NETWORK_OPTION: {:?}",
+//         CONFIGURATION_GLOB_NETWORK_OPTION.get().unwrap()
+//     );
+//     Ok(network_opt)
+// }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Database {
@@ -249,6 +265,17 @@ impl Provider {
             "bitcoin_node" => Provider::BitcoinNode(BitcoinNode::new(endpoint_opt, n)),
             "ethereum_node" => Provider::EthereumNode(EthereumNode::new(endpoint_opt, n)),
             _ => Provider::None,
+        }
+    }
+
+    pub fn as_mut_provider_actions(&mut self) -> Option<&mut dyn ProviderActions> {
+        match self {
+            Provider::Blockstream(provider) => Some(provider),
+            Provider::Blockcypher(provider) => Some(provider),
+            Provider::BitcoinNode(provider) => Some(provider),
+            Provider::EthereumNode(provider) => Some(provider),
+            // Provider::None => None,
+            _ => None,
         }
     }
 }
@@ -345,7 +372,7 @@ impl EndpointOptions {
     }
 }
 
-#[derive(Serialize, Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq, Copy)]
 pub enum Protocol2 {
     #[serde(rename = "bitcoin")]
     Bitcoin,
@@ -366,7 +393,7 @@ impl Protocol2 {
             _ => None,
         }
     }
-    fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             Protocol2::Bitcoin => "bitcoin".to_string(),
             Protocol2::Ethereum => "ethereum".to_string(),
@@ -375,7 +402,7 @@ impl Protocol2 {
         }
     }
 }
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq, Copy)]
 pub enum Network2 {
     #[serde(rename = "mainnet")]
     Mainnet,
@@ -397,6 +424,15 @@ impl Network2 {
             "sepolia" => Some(Network2::Sepolia),
             "ghostnet" => Some(Network2::Ghostnet),
             _ => None,
+        }
+    }
+    pub fn to_string(&self) -> String {
+        match self {
+            Network2::Mainnet => "mainnet".to_string(),
+            Network2::Testnet => "testnet".to_string(),
+            Network2::Goerli => "goerli".to_string(),
+            Network2::Sepolia => "sepolia".to_string(),
+            Network2::Ghostnet => "ghostnet".to_string(),
         }
     }
 }
