@@ -1,9 +1,11 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
 
+use crate::conf2;
 #[cfg(test)]
 use crate::configuration::NetworkName;
-use crate::configuration::{self, EndpointActions};
+use crate::configuration::{self, Endpoint, EndpointActions};
+use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
@@ -15,9 +17,6 @@ pub struct BitcoinNode {
     pub endpoint: configuration::Endpoint,
 }
 impl BitcoinNode {
-    pub fn new(endpoint: configuration::Endpoint) -> BitcoinNode {
-        BitcoinNode { endpoint }
-    }
     #[cfg(test)]
     pub fn test_new(url: &str, net: NetworkName) -> Self {
         BitcoinNode {
@@ -27,6 +26,15 @@ impl BitcoinNode {
 }
 #[async_trait]
 impl ProviderActions for BitcoinNode {
+    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> BitcoinNode {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            last_request: 0,
+        };
+        BitcoinNode { endpoint }
+    }
     /* Bitcoin Rpc work like this:
     1. Get the best block hash
     2. Get the block

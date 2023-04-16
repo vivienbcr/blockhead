@@ -10,9 +10,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::{
+    conf2::EndpointOptions,
     endpoints::{
         bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream,
-        ethereum_node::EthereumNode,
+        ethereum_node::EthereumNode, ProviderActions,
     },
     requests::client::ReqwestClient,
 };
@@ -97,7 +98,10 @@ where
                                     .map(|e| {
                                         let mut e = e.clone();
                                         e.network = k.clone();
-                                        BitcoinNode::new(e.clone())
+                                        BitcoinNode::new(
+                                            EndpointOptions::new(),
+                                            crate::conf2::Network2::Mainnet,
+                                        ) //FIXME : CHanged for test config2
                                     })
                                     .collect();
                                 bitcoin_opts.rpc = Some(bitcoin_nodes);
@@ -109,11 +113,17 @@ where
                                     BitcoinAvailableEndpoints::from_str(endpoint_param_name);
                                 match endpoint_param_name {
                                     Ok(BitcoinAvailableEndpoints::Blockstream) => {
-                                        let blockstream = Blockstream::new(endpoint);
+                                        let blockstream = Blockstream::new(
+                                            EndpointOptions::new(),
+                                            crate::conf2::Network2::Mainnet,
+                                        ); //FIXME : CHanged for test config2
                                         bitcoin_opts.blockstream = Some(blockstream);
                                     }
                                     Ok(BitcoinAvailableEndpoints::Blockcypher) => {
-                                        let blockcypher = Blockcypher::new(endpoint);
+                                        let blockcypher = Blockcypher::new(
+                                            EndpointOptions::new(),
+                                            crate::conf2::Network2::Mainnet,
+                                        ); //FIXME : CHanged for test config2
                                         bitcoin_opts.blockcypher = Some(blockcypher);
                                     }
                                     _ => {
@@ -152,7 +162,10 @@ where
                                     .map(|e| {
                                         let mut e = e.clone();
                                         e.network = k.clone();
-                                        EthereumNode::new(e.clone())
+                                        EthereumNode::new(
+                                            EndpointOptions::new(),
+                                            crate::conf2::Network2::Mainnet,
+                                        )
                                     })
                                     .collect();
                                 ethereum_opts.rpc = Some(ethereum_nodes);
@@ -545,14 +558,22 @@ impl<'de> Deserialize<'de> for Endpoint {
         })
     }
 }
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct EndpointOptions {
-    pub url: Option<String>,
-    pub retry: Option<u32>,
-    pub delay: Option<u32>,
-    pub rate: Option<u32>,
-}
+// #[derive(Deserialize, Serialize, Debug, Clone)]
+// pub struct EndpointOptions {
+//     pub url: Option<String>,
+//     pub retry: Option<u32>,
+//     pub delay: Option<u32>,
+//     pub rate: Option<u32>,
+// }
 impl EndpointOptions {
+    pub fn new() -> Self {
+        EndpointOptions {
+            url: None,
+            retry: None,
+            delay: None,
+            rate: None,
+        }
+    }
     pub fn init(&mut self, url: Option<&str>) {
         if url.is_some() {
             self.url = Some(url.unwrap().to_string());

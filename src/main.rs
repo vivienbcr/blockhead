@@ -2,6 +2,7 @@ use futures::future;
 pub mod api;
 pub mod collectors;
 pub mod commons;
+pub mod conf2;
 pub mod configuration;
 pub mod db;
 pub mod endpoints;

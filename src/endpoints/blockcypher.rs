@@ -4,7 +4,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     commons::blockchain::{self, Block},
-    configuration::{self, EndpointActions, NetworkName, ProtocolName},
+    conf2,
+    configuration::{self, Endpoint, EndpointActions, NetworkName, ProtocolName},
+    requests::client::ReqwestClient,
 };
 
 use super::ProviderActions;
@@ -16,6 +18,15 @@ pub struct Blockcypher {
 
 #[async_trait]
 impl ProviderActions for Blockcypher {
+    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> Blockcypher {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            last_request: 0,
+        };
+        Blockcypher { endpoint }
+    }
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
@@ -31,9 +42,6 @@ impl ProviderActions for Blockcypher {
 }
 
 impl Blockcypher {
-    pub fn new(endpoint: configuration::Endpoint) -> Blockcypher {
-        Blockcypher { endpoint }
-    }
     pub fn test_new(url: &str, net: NetworkName) -> Self {
         Blockcypher {
             endpoint: configuration::Endpoint::test_new(url, net),

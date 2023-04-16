@@ -1,6 +1,8 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
-use crate::configuration::{self, EndpointActions};
+use crate::conf2;
+use crate::configuration::{self, Endpoint, EndpointActions};
+use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
@@ -12,6 +14,15 @@ pub struct EthereumNode {
 }
 #[async_trait]
 impl ProviderActions for EthereumNode {
+    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> EthereumNode {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            last_request: 0,
+        };
+        EthereumNode { endpoint }
+    }
     async fn parse_top_blocks(
         &mut self,
         n_block: u32,
@@ -40,9 +51,6 @@ impl ProviderActions for EthereumNode {
 }
 
 impl EthereumNode {
-    pub fn new(endpoint: configuration::Endpoint) -> EthereumNode {
-        EthereumNode { endpoint }
-    }
     #[cfg(test)]
     pub fn test_new(url: &str, net: configuration::NetworkName) -> Self {
         EthereumNode {

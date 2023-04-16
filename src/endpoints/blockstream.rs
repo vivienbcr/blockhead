@@ -3,7 +3,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
-    configuration::{self, EndpointActions},
+    conf2,
+    configuration::{self, Endpoint, EndpointActions},
+    requests::client::ReqwestClient,
 };
 
 use super::ProviderActions;
@@ -15,6 +17,15 @@ pub struct Blockstream {
 
 #[async_trait]
 impl ProviderActions for Blockstream {
+    fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> Blockstream {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            last_request: 0,
+        };
+        Blockstream { endpoint }
+    }
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
@@ -45,9 +56,6 @@ impl ProviderActions for Blockstream {
 }
 
 impl Blockstream {
-    pub fn new(endpoint: configuration::Endpoint) -> Blockstream {
-        Blockstream { endpoint }
-    }
     async fn get_blocks_from_height(
         &self,
         height: u32,
