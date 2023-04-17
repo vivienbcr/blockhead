@@ -197,7 +197,7 @@ mod test {
     #[tokio::test]
     async fn test_get_best_block_hash() {
         tests::setup();
-        let url = env::var("BITCOIN_RPC_URL").unwrap();
+        let url = env::var("BITCOIN_NODE_URL").unwrap();
         let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network::Mainnet);
         let res = bitcoin_node.get_best_block_hash().await;
         assert!(
@@ -210,7 +210,7 @@ mod test {
     #[tokio::test]
     async fn test_get_block() {
         tests::setup();
-        let url = env::var("BITCOIN_RPC_URL").unwrap();
+        let url = env::var("BITCOIN_NODE_URL").unwrap();
         let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network::Mainnet);
         let res = bitcoin_node
             .get_block(&"00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce")

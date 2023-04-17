@@ -188,10 +188,8 @@ mod tests {
         tests::setup();
         let n_block = 10;
         let height = 100;
-        let mut blockcypher = Blockcypher::test_new(
-            &env::var("BLOCKCYPHER_API_URL").unwrap(),
-            crate::conf::Network::Mainnet,
-        );
+        let mut blockcypher =
+            Blockcypher::test_new("https://api.blockcypher.com", crate::conf::Network::Mainnet);
         let res = blockcypher
             .get_blocks_from_height(height, n_block)
             .await
