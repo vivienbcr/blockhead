@@ -558,13 +558,7 @@ impl<'de> Deserialize<'de> for Endpoint {
         })
     }
 }
-// #[derive(Deserialize, Serialize, Debug, Clone)]
-// pub struct EndpointOptions {
-//     pub url: Option<String>,
-//     pub retry: Option<u32>,
-//     pub delay: Option<u32>,
-//     pub rate: Option<u32>,
-// }
+
 impl EndpointOptions {
     pub fn new() -> Self {
         EndpointOptions {

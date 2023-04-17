@@ -13,5 +13,7 @@ pub trait ProviderActions: Send {
         &mut self,
         n_block: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>>;
+    //TODO: parse_top_blocks should fail if head not changed (avoid to parse all blocks)
+
     // fn new(endpoint: crate::conf2::EndpointOptions, network: conf2::Network2) -> Self;
 }

@@ -3,7 +3,6 @@ pub mod api;
 pub mod collectors;
 pub mod commons;
 pub mod conf2;
-pub mod configuration;
 pub mod db;
 pub mod endpoints;
 pub mod prom;
@@ -15,9 +14,8 @@ use crate::{
     api::{app, metrics},
     prom::registry::register_custom_metrics,
 };
-use db::Redb;
-// use crate::configuration;
 use actix_web::{middleware, App, HttpServer};
+use db::Redb;
 #[macro_use]
 extern crate log;
 
@@ -58,51 +56,6 @@ async fn main() -> std::io::Result<()> {
             ));
         })
     });
-
-    // let config = match configuration::Configuration::new() {
-    //     Ok(c) => {
-    //         info!("Configuration loaded successfully");
-    //         c
-    //     }
-    //     Err(e) => {
-    //         error!("Error loading configuration: {}", e);
-    //         std::process::exit(1);
-    //     }
-    // };
-
-    // config.protocols.iter().for_each(|protocol| {
-    //     let proto_name = protocol.0.clone(); // Bitcoin, Ethereum, etc
-    //     let map_networks = protocol.1.clone(); // mainnet, testnet, etc
-    //     match &proto_name {
-    //         configuration::ProtocolName::Bitcoin => {
-    //             info!("Bitcoin endpoints detected... ");
-    //             map_networks.iter().for_each(|map_network| {
-    //                 let network = map_network.0.clone();
-    //                 let endpoints = map_network.1.clone(); // At this point, ProtocolsOpts is only BitcoinOpts
-    //                 match &endpoints {
-    //                     configuration::ProtocolsOpts::Bitcoin(endpoints) => {
-    //                         tokio::task::spawn(bitcoin::bitcoin(network, endpoints.clone()));
-    //                     }
-    //                     _ => {}
-    //                 }
-    //             })
-    //         }
-    //         configuration::ProtocolName::Ethereum => {
-    //             info!("Ethereum endpoints detected... ");
-    //             map_networks.iter().for_each(|map_network| {
-    //                 let network = map_network.0.clone();
-    //                 let endpoints = map_network.1.clone(); // At this point, ProtocolsOpts is only BitcoinOpts
-    //                 match &endpoints {
-    //                     configuration::ProtocolsOpts::Ethereum(endpoints) => {
-    //                         tokio::task::spawn(ethereum::ethereum(network, endpoints.clone()));
-    //                     }
-    //                     _ => {}
-    //                 }
-    //             })
-    //         }
-    //         _ => {}
-    //     }
-    // });
     let default_panic = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         default_panic(info);

@@ -3,7 +3,6 @@ use std::time::Duration;
 use crate::{
     commons::blockchain,
     conf2::{Network2, NetworkAppOptions, Protocol2, Provider},
-    configuration::ProtocolName,
     db::DATABASE,
     endpoints::ProviderActions,
     prom,

@@ -1,19 +1,19 @@
 use async_trait::async_trait;
 use chrono::DateTime;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
     commons::blockchain::{self, Block},
-    conf2,
-    configuration::{self, Endpoint, EndpointActions, NetworkName, ProtocolName},
+    conf2::{self, Endpoint, EndpointActions, Protocol2},
+    // configuration::{self, Endpoint, EndpointActions, NetworkName, ProtocolName},
     requests::client::ReqwestClient,
 };
 
 use super::ProviderActions;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Blockcypher {
-    pub endpoint: configuration::Endpoint,
+    pub endpoint: Endpoint,
 }
 
 #[async_trait]
@@ -40,15 +40,15 @@ impl Blockcypher {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            network: network, //FIXME : use network2 instead
             last_request: 0,
         };
         Blockcypher { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: NetworkName) -> Self {
+    pub fn test_new(url: &str, net: crate::conf2::Network2) -> Self {
         Blockcypher {
-            endpoint: configuration::Endpoint::test_new(url, net),
+            endpoint: conf2::Endpoint::test_new(url, net),
         }
     }
     async fn get_chain_height(&mut self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
@@ -102,7 +102,7 @@ impl Blockcypher {
         let res = client
             .get(
                 &url,
-                &ProtocolName::Bitcoin.to_string(),
+                &Protocol2::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
             .await;
@@ -177,8 +177,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_chain_height() {
         tests::setup();
-        let mut blockcypher =
-            Blockcypher::test_new("https://api.blockcypher.com", NetworkName::Mainnet);
+        let mut blockcypher = Blockcypher::test_new(
+            "https://api.blockcypher.com",
+            crate::conf2::Network2::Mainnet,
+        );
         let res = blockcypher.get_chain_height().await.unwrap();
         assert!(res > 0);
     }
@@ -190,7 +192,7 @@ mod tests {
         let height = 100;
         let mut blockcypher = Blockcypher::test_new(
             &env::var("BLOCKCYPHER_API_URL").unwrap(),
-            NetworkName::Mainnet,
+            crate::conf2::Network2::Mainnet,
         );
         let res = blockcypher
             .get_blocks_from_height(height, n_block)

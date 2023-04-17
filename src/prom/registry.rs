@@ -4,10 +4,7 @@ use once_cell::sync::Lazy;
 
 use prometheus::Registry;
 
-use crate::{
-    conf2::{Network2, Protocol2},
-    configuration::{NetworkName, ProtocolName},
-};
+use crate::conf2::{Network2, Protocol2};
 
 use super::metrics::{self, BLOCKCHAIN_HEAD_TIMESTAMP, BLOCKCHAIN_HEAD_TXS, BLOCKCHAIN_HEIGHT};
 

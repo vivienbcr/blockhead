@@ -1,16 +1,19 @@
 use crate::{
-    configuration::{Metrics, Server},
     endpoints::{
         bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream,
         ethereum_node::EthereumNode, ProviderActions,
     },
+    requests::client::ReqwestClient,
 };
 use config::{self, ConfigError, File};
 
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 // pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
@@ -27,7 +30,7 @@ struct ProtoOptsProvider {
 /**
  * Configuration is the main struct used to store all configuration
  */
-#[derive(Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Configuration {
     pub global: Global,
     pub database: Database,
@@ -43,7 +46,18 @@ impl Configuration {
         self.proto_opts.get(protocol)?.get(network)
     }
 }
-
+pub fn get_enabled_protocol_network() -> HashMap<Protocol2, Vec<Network2>> {
+    let config = CONFIGURATION.get().unwrap();
+    let mut res = HashMap::new();
+    for (proto, networks) in &config.proto_opts {
+        let mut net_names = Vec::new();
+        for (net, _) in networks {
+            net_names.push(net.clone().into());
+        }
+        res.insert(proto.clone().into(), net_names);
+    }
+    res
+}
 /**
  * Deserialize configuration is used to be sure global configuration will be deserialized first
  * global configuration set some default values wich endpoint will reuse at their initialization
@@ -120,9 +134,9 @@ where
                     }
                 };
                 // Deserialize providers and network options
+                let mut providers = Vec::new();
                 let o: Value = serde_json::from_str(&opts.to_string()).unwrap();
                 o.as_object().unwrap().iter().for_each(|(provider, opt)| {
-                    let mut providers = Vec::new();
                     let endpoints_options: Value = serde_json::from_str(&opt.to_string()).unwrap();
                     match provider.as_str() {
                         // At deserialization, if user specify network options we merge them with global options
@@ -172,15 +186,22 @@ where
                             debug!("endpoint_opt: {:?}", default_endpoint_opt);
 
                             let provider = Provider::from_str(str, default_endpoint_opt, &network);
+                            debug!("provider: {:?}", provider);
                             providers.push(provider);
                         }
                     }
-                    net_providers.insert(network.clone(), providers);
                 });
+                debug!(
+                    "Protocol: {} Network: {} Providers: {}",
+                    protocol.to_string(),
+                    network.to_string(),
+                    providers.len()
+                );
+                net_providers.insert(network.clone(), providers);
             });
             // After deserialization, if user didn't specify network options we use global options
             if net_opts.is_empty() {
-                let mut net_opt = global.networks_options.clone();
+                let net_opt = global.networks_options.clone();
                 net_opts.insert(Network2::Mainnet, net_opt);
             }
 
@@ -204,51 +225,21 @@ pub struct Global {
     pub metrics: Metrics,
     pub server: Server,
 }
-// deserialize_global_endpoint_options
-// Is used to init global endpoint options, this Global will be consider as default values for all endpoints
-// it should be deserialized first and set global to be reused by all endpoints deserialization and initialization
-// fn deserialize_global_endpoint_options<'de, D>(deserializer: D) -> Result<EndpointOptions, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     let endpoint_opt = EndpointOptions::deserialize(deserializer).unwrap();
-//     debug!("deserialize_global_endpoint_options: {:?}", endpoint_opt);
-//     CONFIGURATION_GLOB_ENDPOINT_OPTION
-//         .set(endpoint_opt.clone())
-//         .unwrap();
-//     debug!(
-//         "set CONFIGURATION_GLOB_ENDPOINT_OPTION: {:?}",
-//         CONFIGURATION_GLOB_ENDPOINT_OPTION.get().unwrap()
-//     );
-//     Ok(endpoint_opt)
-// }
-// deserialize_global_network_options
-// Is used to init global network options, this Global will be consider as default values for all endpoints
-// it should be deserialized first and set global to be reused by all endpoints deserialization and initialization
-// fn deserialize_global_network_options<'de, D>(
-//     deserializer: D,
-// ) -> Result<NetworkAppOptions, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     let network_opt = NetworkAppOptions::deserialize(deserializer).unwrap();
-//     debug!("deserialize_global_network_options: {:?}", network_opt);
-//     CONFIGURATION_GLOB_NETWORK_OPTION
-//         .set(network_opt.clone())
-//         .unwrap();
-//     debug!(
-//         "set CONFIGURATION_GLOB_NETWORK_OPTION: {:?}",
-//         CONFIGURATION_GLOB_NETWORK_OPTION.get().unwrap()
-//     );
-//     Ok(network_opt)
-// }
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Metrics {
+    pub port: u16,
+}
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Server {
+    pub port: u16,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Database {
     pub keep_history: u32,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum Provider {
     Blockstream(Blockstream),
     Blockcypher(Blockcypher),
@@ -280,7 +271,7 @@ impl Provider {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum EthereumProviders {
     Rpc(Vec<EthereumNode>),
 }
@@ -370,6 +361,15 @@ impl EndpointOptions {
         }
         Ok(())
     }
+
+    pub fn test_new(url: &str) -> Self {
+        EndpointOptions {
+            url: Some(url.to_string()),
+            retry: Some(3),
+            delay: Some(1),
+            rate: Some(5),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq, Copy)]
@@ -436,15 +436,60 @@ impl Network2 {
         }
     }
 }
-
-const DEFAULT_SERVER_PORT: u32 = 8080;
-const DEFAULT_METRICS_PORT: u16 = 8081;
-const DEFAULT_HEAD_LENGTH: u32 = 5;
-const DEFAULT_TICK_RATE: u32 = 5;
-const DEFAULT_ENDPOINT_RETRY: u32 = 3;
-const DEFAULT_ENDPOINT_DELAY: u32 = 1;
-const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
-const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
+#[derive(Serialize, Debug, Clone)]
+pub struct Endpoint {
+    pub url: String,
+    // pub options: Option<EndpointOptions>,
+    #[serde(skip)]
+    pub reqwest: Option<ReqwestClient>,
+    #[serde(skip)]
+    pub network: Network2,
+    #[serde(skip)]
+    pub last_request: u64,
+}
+impl Endpoint {
+    pub fn test_new(url: &str, net: Network2) -> Self {
+        let opt = EndpointOptions::test_new(url);
+        Endpoint {
+            last_request: 0,
+            url: url.to_string(),
+            network: net,
+            reqwest: Some(ReqwestClient::new(opt)),
+        }
+    }
+}
+impl EndpointActions for Endpoint {
+    fn set_last_request(&mut self) {
+        self.last_request = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+    }
+    fn available(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+        let diff = now - self.last_request;
+        if diff < self.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
+            debug!("Rate limit reached for {} ({}s)", self.url, diff);
+            return false;
+        }
+        true
+    }
+}
+pub trait EndpointActions {
+    fn set_last_request(&mut self);
+    fn available(&self) -> bool;
+}
+pub const DEFAULT_SERVER_PORT: u32 = 8080;
+pub const DEFAULT_METRICS_PORT: u16 = 8081;
+pub const DEFAULT_HEAD_LENGTH: u32 = 5;
+pub const DEFAULT_TICK_RATE: u32 = 5;
+pub const DEFAULT_ENDPOINT_RETRY: u32 = 3;
+pub const DEFAULT_ENDPOINT_DELAY: u32 = 1;
+pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
+pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
 
 impl Configuration {
     pub fn new(file: &str) -> Result<Self, ConfigError> {

@@ -3,16 +3,16 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
-    conf2,
-    configuration::{self, Endpoint, EndpointActions},
+    conf2::{self, Endpoint, EndpointActions},
+    // configuration::{self, Endpoint, EndpointActions},
     requests::client::ReqwestClient,
 };
 
 use super::ProviderActions;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Blockstream {
-    pub endpoint: configuration::Endpoint,
+    pub endpoint: Endpoint,
 }
 
 #[async_trait]
@@ -54,7 +54,7 @@ impl Blockstream {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: configuration::NetworkName::Mainnet, //FIXME : use network2 instead
+            network: network, //FIXME : use network2 instead
             last_request: 0,
         };
         Blockstream { endpoint }
@@ -80,7 +80,7 @@ impl Blockstream {
         let res = reqwest
             .get(
                 url,
-                &configuration::ProtocolName::Bitcoin.to_string(),
+                &conf2::Protocol2::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
             .await;
