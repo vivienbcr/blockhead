@@ -6,17 +6,17 @@ use serde_json::to_string;
 
 use crate::{
     commons::blockchain::Blockchain,
-    conf2::{get_enabled_protocol_network, Network2, Protocol2},
+    conf::{get_enabled_protocol_network, Network, Protocol},
     db::DATABASE,
 };
 
 #[derive(Deserialize, Debug)]
 struct BlockchainRouteParams {
-    protocol: Option<Protocol2>,
-    network: Option<Network2>,
+    protocol: Option<Protocol>,
+    network: Option<Network>,
 }
 
-type BlockchainRes = HashMap<Protocol2, HashMap<Network2, Blockchain>>;
+type BlockchainRes = HashMap<Protocol, HashMap<Network, Blockchain>>;
 
 #[get("/ping")]
 async fn ping_handler() -> HttpResponse {

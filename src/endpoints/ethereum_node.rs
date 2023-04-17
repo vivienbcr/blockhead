@@ -1,6 +1,6 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
-use crate::conf2::{self, Endpoint, EndpointActions};
+use crate::conf::{self, Endpoint, EndpointActions};
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Debug, Clone)]
 pub struct EthereumNode {
-    pub endpoint: conf2::Endpoint,
+    pub endpoint: conf::Endpoint,
 }
 #[async_trait]
 impl ProviderActions for EthereumNode {
@@ -44,7 +44,7 @@ impl ProviderActions for EthereumNode {
 }
 
 impl EthereumNode {
-    pub fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> EthereumNode {
+    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> EthereumNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
@@ -54,9 +54,9 @@ impl EthereumNode {
         EthereumNode { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: conf2::Network2) -> Self {
+    pub fn test_new(url: &str, net: conf::Network) -> Self {
         EthereumNode {
-            endpoint: conf2::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, net),
         }
     }
     pub async fn get_block_by_number(
@@ -98,7 +98,7 @@ impl EthereumNode {
         let res = reqwest
             .rpc(
                 &req,
-                &conf2::Protocol2::Ethereum.to_string(),
+                &conf::Protocol::Ethereum.to_string(),
                 &self.endpoint.network.to_string(),
             )
             .await;
@@ -223,7 +223,7 @@ mod test {
         tests::setup();
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
-            conf2::Network2::Mainnet,
+            conf::Network::Mainnet,
         );
         let block = ethereum_node
             .get_block_by_number(None, false)
@@ -238,7 +238,7 @@ mod test {
         let block_len = 5;
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
-            conf2::Network2::Mainnet,
+            conf::Network::Mainnet,
         );
         let block = ethereum_node
             .get_block_by_number(None, false)
@@ -276,7 +276,7 @@ mod test {
         tests::setup();
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
-            conf2::Network2::Mainnet,
+            conf::Network::Mainnet,
         );
         let res = ethereum_node.parse_top_blocks(5).await.unwrap();
         assert_eq!(res.blocks.len(), 5);

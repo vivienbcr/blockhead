@@ -1,7 +1,7 @@
 use super::ProviderActions;
 use crate::commons::blockchain;
 
-use crate::conf2::{self, Endpoint, EndpointActions};
+use crate::conf::{self, Endpoint, EndpointActions};
 
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
@@ -12,10 +12,10 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Debug, Clone)]
 pub struct BitcoinNode {
-    pub endpoint: conf2::Endpoint,
+    pub endpoint: conf::Endpoint,
 }
 impl BitcoinNode {
-    pub fn new(options: conf2::EndpointOptions, network: conf2::Network2) -> BitcoinNode {
+    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> BitcoinNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
@@ -25,9 +25,9 @@ impl BitcoinNode {
         BitcoinNode { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: crate::conf2::Network2) -> Self {
+    pub fn test_new(url: &str, net: crate::conf::Network) -> Self {
         BitcoinNode {
-            endpoint: conf2::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, net),
         }
     }
 }
@@ -124,7 +124,7 @@ impl BitcoinNode {
         let res = reqwest
             .rpc(
                 &body,
-                &conf2::Protocol2::Bitcoin.to_string(),
+                &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
             .await;
@@ -191,14 +191,14 @@ pub struct BIP9 {
 mod test {
     extern crate env_logger;
     use super::*;
-    use crate::{conf2::Network2, tests};
+    use crate::{conf::Network, tests};
     use std::env;
 
     #[tokio::test]
     async fn test_get_best_block_hash() {
         tests::setup();
         let url = env::var("BITCOIN_RPC_URL").unwrap();
-        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network2::Mainnet);
+        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network::Mainnet);
         let res = bitcoin_node.get_best_block_hash().await;
         assert!(
             res.is_ok(),
@@ -211,7 +211,7 @@ mod test {
     async fn test_get_block() {
         tests::setup();
         let url = env::var("BITCOIN_RPC_URL").unwrap();
-        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network2::Mainnet);
+        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network::Mainnet);
         let res = bitcoin_node
             .get_block(&"00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce")
             .await;

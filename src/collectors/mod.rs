@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     commons::blockchain,
-    conf2::{Network2, NetworkAppOptions, Protocol2, Provider},
+    conf::{Network, NetworkAppOptions, Protocol, Provider},
     db::DATABASE,
     endpoints::ProviderActions,
     prom,
@@ -12,8 +12,8 @@ use crate::{
 // pub mod ethereum;
 
 pub async fn runner(
-    protocol: Protocol2,
-    network: Network2,
+    protocol: Protocol,
+    network: Network,
     providers: Vec<Provider>,
     net_opts: NetworkAppOptions,
 ) {

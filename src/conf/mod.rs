@@ -18,10 +18,10 @@ use std::{
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 // pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
 // pub static CONFIGURATION_GLOB_NETWORK_OPTION: OnceCell<NetworkAppOptions> = OnceCell::new();
-type NetworkProvider = HashMap<Network2, Vec<Provider>>;
-type NetworkOptions = HashMap<Network2, NetworkAppOptions>;
-type ProtocolsNetworksOpts = HashMap<Protocol2, NetworkOptions>;
-type ProtocolsNetworksProviders = HashMap<Protocol2, NetworkProvider>;
+type NetworkProvider = HashMap<Network, Vec<Provider>>;
+type NetworkOptions = HashMap<Network, NetworkAppOptions>;
+type ProtocolsNetworksOpts = HashMap<Protocol, NetworkOptions>;
+type ProtocolsNetworksProviders = HashMap<Protocol, NetworkProvider>;
 struct ProtoOptsProvider {
     pub proto_opts: ProtocolsNetworksOpts,
     pub proto_providers: ProtocolsNetworksProviders,
@@ -40,13 +40,13 @@ pub struct Configuration {
 impl Configuration {
     pub fn get_network_options(
         &self,
-        protocol: &Protocol2,
-        network: &Network2,
+        protocol: &Protocol,
+        network: &Network,
     ) -> Option<&NetworkAppOptions> {
         self.proto_opts.get(protocol)?.get(network)
     }
 }
-pub fn get_enabled_protocol_network() -> HashMap<Protocol2, Vec<Network2>> {
+pub fn get_enabled_protocol_network() -> HashMap<Protocol, Vec<Network>> {
     let config = CONFIGURATION.get().unwrap();
     let mut res = HashMap::new();
     for (proto, networks) in &config.proto_opts {
@@ -115,7 +115,7 @@ where
             debug!("Deserialize protocol {}", proto);
             let mut net_opts: NetworkOptions = HashMap::new();
             let mut net_providers: NetworkProvider = HashMap::new();
-            let protocol = Protocol2::from(proto.clone());
+            let protocol = Protocol::from(proto.clone());
             let protocol = match protocol {
                 Some(p) => p,
                 _ => {
@@ -126,7 +126,7 @@ where
             let s: Value = serde_json::from_str(&proto_config.to_string()).unwrap();
             s.as_object().unwrap().iter().for_each(|(net, opts)| {
                 debug!("Deserialize network {}", net);
-                let network = Network2::from(net.clone());
+                let network = Network::from(net.clone());
                 let network = match network {
                     Some(n) => n,
                     _ => {
@@ -202,7 +202,7 @@ where
             // After deserialization, if user didn't specify network options we use global options
             if net_opts.is_empty() {
                 let net_opt = global.networks_options.clone();
-                net_opts.insert(Network2::Mainnet, net_opt);
+                net_opts.insert(Network::Mainnet, net_opt);
             }
 
             proto_opts.insert(protocol.clone(), net_opts);
@@ -248,7 +248,7 @@ pub enum Provider {
     None,
 }
 impl Provider {
-    pub fn from_str(provider: &str, endpoint_opt: EndpointOptions, network: &Network2) -> Provider {
+    pub fn from_str(provider: &str, endpoint_opt: EndpointOptions, network: &Network) -> Provider {
         let n = network.to_owned();
         match provider {
             "blockstream" => Provider::Blockstream(Blockstream::new(endpoint_opt, n)),
@@ -373,7 +373,7 @@ impl EndpointOptions {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq, Copy)]
-pub enum Protocol2 {
+pub enum Protocol {
     #[serde(rename = "bitcoin")]
     Bitcoin,
     #[serde(rename = "ethereum")]
@@ -384,26 +384,26 @@ pub enum Protocol2 {
     None,
 }
 
-impl Protocol2 {
+impl Protocol {
     fn from(s: String) -> Option<Self> {
         match s.as_str() {
-            "bitcoin" => Some(Protocol2::Bitcoin),
-            "ethereum" => Some(Protocol2::Ethereum),
-            "tezos" => Some(Protocol2::Tezos),
+            "bitcoin" => Some(Protocol::Bitcoin),
+            "ethereum" => Some(Protocol::Ethereum),
+            "tezos" => Some(Protocol::Tezos),
             _ => None,
         }
     }
     pub fn to_string(&self) -> String {
         match self {
-            Protocol2::Bitcoin => "bitcoin".to_string(),
-            Protocol2::Ethereum => "ethereum".to_string(),
-            Protocol2::Tezos => "tezos".to_string(),
-            Protocol2::None => "None".to_string(),
+            Protocol::Bitcoin => "bitcoin".to_string(),
+            Protocol::Ethereum => "ethereum".to_string(),
+            Protocol::Tezos => "tezos".to_string(),
+            Protocol::None => "None".to_string(),
         }
     }
 }
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq, Copy)]
-pub enum Network2 {
+pub enum Network {
     #[serde(rename = "mainnet")]
     Mainnet,
     #[serde(rename = "testnet")]
@@ -415,24 +415,24 @@ pub enum Network2 {
     #[serde(rename = "ghostnet")]
     Ghostnet,
 }
-impl Network2 {
+impl Network {
     fn from(s: String) -> Option<Self> {
         match s.as_str() {
-            "mainnet" => Some(Network2::Mainnet),
-            "testnet" => Some(Network2::Testnet),
-            "goerli" => Some(Network2::Goerli),
-            "sepolia" => Some(Network2::Sepolia),
-            "ghostnet" => Some(Network2::Ghostnet),
+            "mainnet" => Some(Network::Mainnet),
+            "testnet" => Some(Network::Testnet),
+            "goerli" => Some(Network::Goerli),
+            "sepolia" => Some(Network::Sepolia),
+            "ghostnet" => Some(Network::Ghostnet),
             _ => None,
         }
     }
     pub fn to_string(&self) -> String {
         match self {
-            Network2::Mainnet => "mainnet".to_string(),
-            Network2::Testnet => "testnet".to_string(),
-            Network2::Goerli => "goerli".to_string(),
-            Network2::Sepolia => "sepolia".to_string(),
-            Network2::Ghostnet => "ghostnet".to_string(),
+            Network::Mainnet => "mainnet".to_string(),
+            Network::Testnet => "testnet".to_string(),
+            Network::Goerli => "goerli".to_string(),
+            Network::Sepolia => "sepolia".to_string(),
+            Network::Ghostnet => "ghostnet".to_string(),
         }
     }
 }
@@ -443,12 +443,12 @@ pub struct Endpoint {
     #[serde(skip)]
     pub reqwest: Option<ReqwestClient>,
     #[serde(skip)]
-    pub network: Network2,
+    pub network: Network,
     #[serde(skip)]
     pub last_request: u64,
 }
 impl Endpoint {
-    pub fn test_new(url: &str, net: Network2) -> Self {
+    pub fn test_new(url: &str, net: Network) -> Self {
         let opt = EndpointOptions::test_new(url);
         Endpoint {
             last_request: 0,
@@ -518,12 +518,12 @@ impl Configuration {
 
 #[cfg(test)]
 mod test {
-    use crate::tests;
+    use crate::{conf::Configuration, tests};
 
     #[tokio::test]
     async fn test_config() {
         tests::setup();
-        let config = super::Configuration::new("./tests/sample_config.yaml").unwrap();
+        let config = Configuration::new("./tests/sample_config.yaml").unwrap();
         println!("{:?}", config);
     }
 }

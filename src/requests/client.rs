@@ -1,6 +1,6 @@
 use reqwest::Client;
 
-use crate::conf2::EndpointOptions;
+use crate::conf::EndpointOptions;
 
 #[derive(Debug, Clone)]
 pub struct ReqwestClient {

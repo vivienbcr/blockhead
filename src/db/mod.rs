@@ -7,7 +7,7 @@ use std::io;
 
 use crate::{
     commons::blockchain::{self, Block},
-    conf2::{Network2, Protocol2, CONFIGURATION},
+    conf::{Network, Protocol, CONFIGURATION},
 };
 const TABLE: TableDefinition<&str, &str> = TableDefinition::new("blockchain");
 pub static DATABASE: OnceCell<Redb> = OnceCell::new();
@@ -75,13 +75,13 @@ impl Redb {
         write_txn.commit()?;
         Ok(())
     }
-    fn to_db_key(protocol: &Protocol2, network: &Network2) -> String {
+    fn to_db_key(protocol: &Protocol, network: &Network) -> String {
         format!("{}-{}", protocol.to_string(), network.to_string())
     }
     pub fn get_blockchain(
         &self,
-        protocol: &Protocol2,
-        network: &Network2,
+        protocol: &Protocol,
+        network: &Network,
     ) -> Result<blockchain::Blockchain, Box<dyn Error + Send + Sync>> {
         debug!("Redb get_blockchain({:?},{:?})", protocol, network);
         let read_txn = self.db.begin_read()?;
@@ -103,8 +103,8 @@ impl Redb {
     pub fn set_blockchain(
         &self,
         blockchain: &blockchain::Blockchain,
-        protocol: &Protocol2,
-        network: &Network2,
+        protocol: &Protocol,
+        network: &Network,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb set_blockchain({:?},{:?})", protocol, network);
         let chain_db = self.get_blockchain(&protocol, &network);

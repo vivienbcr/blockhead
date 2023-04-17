@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 
 use prometheus::Registry;
 
-use crate::conf2::{Network2, Protocol2};
+use crate::conf::{Network, Protocol};
 
 use super::metrics::{self, BLOCKCHAIN_HEAD_TIMESTAMP, BLOCKCHAIN_HEAD_TXS, BLOCKCHAIN_HEIGHT};
 
@@ -59,8 +59,8 @@ pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &st
 }
 
 pub fn set_blockchain_metrics(
-    protocol: Protocol2,
-    network: Network2,
+    protocol: Protocol,
+    network: Network,
     head_height: i64,
     head_time: i64,
     head_txs: i64,

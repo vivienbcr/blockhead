@@ -2,7 +2,7 @@ use futures::future;
 pub mod api;
 pub mod collectors;
 pub mod commons;
-pub mod conf2;
+pub mod conf;
 pub mod db;
 pub mod endpoints;
 pub mod prom;
@@ -38,7 +38,7 @@ async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env);
     register_custom_metrics();
 
-    let config = conf2::Configuration::new("config.yaml").unwrap();
+    let config = conf::Configuration::new("config.yaml").unwrap();
     let protocols_networks = config.proto_providers.clone();
     protocols_networks.iter().for_each(|n| {
         let protocol = n.0.clone();
