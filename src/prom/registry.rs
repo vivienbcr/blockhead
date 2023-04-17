@@ -25,17 +25,10 @@ pub fn register_custom_metrics() {
 }
 pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &str, network: &str) {
     // retain only https://domain.tld
-    let base_domain = url
-        .split('/')
-        .nth(2)
-        .unwrap_or("unknown")
-        .split(':')
-        .nth(0)
-        .unwrap_or("unknown");
-
+    let base_domain = get_base_url(url);
     metrics::HTTP_REQUEST_CODE
         .with_label_values(&[
-            base_domain,
+            &base_domain,
             &status_code.to_string(),
             method,
             protocol,
@@ -46,15 +39,9 @@ pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &s
 
 pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &str, time: f64) {
     // retain only https://domain.tld
-    let base_domain = url
-        .split('/')
-        .nth(2)
-        .unwrap_or("unknown")
-        .split(':')
-        .nth(0)
-        .unwrap_or("unknown");
+    let base_domain = get_base_url(url);
     metrics::ENDPOINT_RESPONSE_TIME
-        .with_label_values(&[base_domain, method, protocol, network])
+        .with_label_values(&[&base_domain, method, protocol, network])
         .observe(time);
 }
 
@@ -74,4 +61,14 @@ pub fn set_blockchain_metrics(
     BLOCKCHAIN_HEAD_TXS
         .with_label_values(&[&protocol.to_string(), &network.to_string()])
         .set(head_txs);
+}
+
+fn get_base_url(url: &str) -> String {
+    url.split('/')
+        .nth(2)
+        .unwrap_or("unknown")
+        .split(':')
+        .nth(0)
+        .unwrap_or("unknown")
+        .to_string()
 }

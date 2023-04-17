@@ -16,8 +16,7 @@ use std::{
 };
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
-// pub static CONFIGURATION_GLOB_ENDPOINT_OPTION: OnceCell<EndpointOptions> = OnceCell::new();
-// pub static CONFIGURATION_GLOB_NETWORK_OPTION: OnceCell<NetworkAppOptions> = OnceCell::new();
+
 type NetworkProvider = HashMap<Network, Vec<Provider>>;
 type NetworkOptions = HashMap<Network, NetworkAppOptions>;
 type ProtocolsNetworksOpts = HashMap<Protocol, NetworkOptions>;
@@ -80,12 +79,6 @@ impl<'de> Deserialize<'de> for Configuration {
             &global,
         )
         .unwrap();
-        // let protocols =
-        //     deserialize_protocols(v.as_object().unwrap().get("protocols").unwrap()).unwrap();
-        // let mut enabled_proto_net = HashMap::new();
-        // protocols.iter().for_each(|(proto, net)| {
-        //     enabled_proto_net.insert(proto.clone(), net.keys().cloned().collect());
-        // });
 
         Ok(Configuration {
             global,
@@ -218,9 +211,7 @@ where
  */
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Global {
-    // #[serde(deserialize_with = "deserialize_global_endpoint_options")]
     pub endpoints: EndpointOptions,
-    // #[serde(deserialize_with = "deserialize_global_network_options")]
     pub networks_options: NetworkAppOptions,
     pub metrics: Metrics,
     pub server: Server,
@@ -320,16 +311,27 @@ pub struct EndpointOptions {
     pub delay: Option<u32>,
     pub rate: Option<u32>,
 }
-
-impl EndpointOptions {
-    //TODO! impl default
-    pub fn from_provider_config_f(provider: ProviderConfigF) -> EndpointOptions {
-        let mut endpoint_opt = EndpointOptions {
+impl Default for EndpointOptions {
+    fn default() -> Self {
+        let mut e = EndpointOptions {
             url: None,
-            retry: None,
-            delay: None,
-            rate: None,
-        }; //TODO use default
+            retry: Some(DEFAULT_ENDPOINT_RETRY),
+            delay: Some(DEFAULT_ENDPOINT_DELAY),
+            rate: Some(DEFAULT_ENDPOINT_REQUEST_RATE),
+        };
+        let global = CONFIGURATION.get();
+        match global {
+            Some(g) => {
+                e.merge(g.global.endpoints.clone()).unwrap_or(());
+            }
+            None => (),
+        }
+        e
+    }
+}
+impl EndpointOptions {
+    pub fn from_provider_config_f(provider: ProviderConfigF) -> EndpointOptions {
+        let mut endpoint_opt = EndpointOptions::default();
         if let Some(url) = provider.url {
             endpoint_opt.url = Some(url);
         }
@@ -361,7 +363,7 @@ impl EndpointOptions {
         }
         Ok(())
     }
-
+    #[cfg(test)]
     pub fn test_new(url: &str) -> Self {
         EndpointOptions {
             url: Some(url.to_string()),
@@ -439,7 +441,6 @@ impl Network {
 #[derive(Serialize, Debug, Clone)]
 pub struct Endpoint {
     pub url: String,
-    // pub options: Option<EndpointOptions>,
     #[serde(skip)]
     pub reqwest: Option<ReqwestClient>,
     #[serde(skip)]
@@ -448,6 +449,7 @@ pub struct Endpoint {
     pub last_request: u64,
 }
 impl Endpoint {
+    #[cfg(test)]
     pub fn test_new(url: &str, net: Network) -> Self {
         let opt = EndpointOptions::test_new(url);
         Endpoint {

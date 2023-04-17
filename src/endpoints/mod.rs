@@ -4,7 +4,6 @@ pub mod bitcoin_node;
 pub mod blockcypher;
 pub mod blockstream;
 pub mod ethereum_node;
-use crate::conf;
 
 #[async_trait]
 pub trait ProviderActions: Send {

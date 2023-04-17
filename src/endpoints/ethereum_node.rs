@@ -130,8 +130,6 @@ impl EthereumNode {
                         .into_iter()
                         .map(|r| {
                             trace!("batch block: {:?}", r);
-                            // catch case where result is empty, if so, return Err
-
                             r.result.unwrap()
                         })
                         .collect();

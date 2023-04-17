@@ -8,9 +8,6 @@ use crate::{
     prom,
 };
 
-// pub mod bitcoin;
-// pub mod ethereum;
-
 pub async fn runner(
     protocol: Protocol,
     network: Network,

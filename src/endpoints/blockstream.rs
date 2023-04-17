@@ -4,7 +4,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     commons::blockchain,
     conf::{self, Endpoint, EndpointActions},
-    // configuration::{self, Endpoint, EndpointActions},
     requests::client::ReqwestClient,
 };
 
@@ -54,7 +53,7 @@ impl Blockstream {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network, //FIXME : use network2 instead
+            network: network,
             last_request: 0,
         };
         Blockstream { endpoint }

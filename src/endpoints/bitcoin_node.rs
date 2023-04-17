@@ -19,7 +19,7 @@ impl BitcoinNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network, //FIXME : use network2 instead
+            network: network,
             last_request: 0,
         };
         BitcoinNode { endpoint }
