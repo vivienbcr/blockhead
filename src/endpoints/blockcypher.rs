@@ -168,8 +168,6 @@ pub struct BlockResponse {
 // log all info and print to stdout
 mod tests {
     extern crate env_logger;
-    use std::env;
-
     use super::*;
     use crate::tests;
 

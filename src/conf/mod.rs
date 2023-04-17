@@ -5,13 +5,17 @@ use crate::{
     },
     requests::client::ReqwestClient,
 };
+
+use clap::{Parser, ValueEnum};
 use config::{self, ConfigError, File};
 
+use env_logger::Env;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::{
     collections::HashMap,
+    path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -228,6 +232,8 @@ pub struct Server {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Database {
     pub keep_history: u32,
+    #[serde(skip)]
+    pub path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -484,6 +490,45 @@ pub trait EndpointActions {
     fn set_last_request(&mut self);
     fn available(&self) -> bool;
 }
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum LogLevel {
+    Info,
+    Debug,
+    Trace,
+}
+impl Default for LogLevel {
+    fn default() -> Self {
+        LogLevel::Info
+    }
+}
+impl LogLevel {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "info" => Some(LogLevel::Info),
+            "debug" => Some(LogLevel::Debug),
+            "trace" => Some(LogLevel::Trace),
+            _ => None,
+        }
+    }
+    pub fn to_string(&self) -> String {
+        match self {
+            LogLevel::Info => "info".to_string(),
+            LogLevel::Debug => "debug".to_string(),
+            LogLevel::Trace => "trace".to_string(),
+        }
+    }
+}
+
+#[derive(Parser)]
+struct Args {
+    #[arg(short, long, value_enum, default_value = "info")]
+    log_level: Option<LogLevel>,
+    #[arg(short, long, default_value = DEFAULT_DB_PATH)]
+    db_path: Option<PathBuf>,
+    #[arg(short, long, default_value = DEFAULT_CONFIG_PATH)]
+    config: Option<PathBuf>,
+}
+
 pub const DEFAULT_SERVER_PORT: u32 = 8080;
 pub const DEFAULT_METRICS_PORT: u16 = 8081;
 pub const DEFAULT_HEAD_LENGTH: u32 = 5;
@@ -492,9 +537,18 @@ pub const DEFAULT_ENDPOINT_RETRY: u32 = 3;
 pub const DEFAULT_ENDPOINT_DELAY: u32 = 1;
 pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
 pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
+pub const DEFAULT_CONFIG_PATH: &str = "config.yaml";
+pub const DEFAULT_DB_PATH: &str = "blockhead.db";
+pub const DEFAULT_LOG_LEVEL: &str = "info";
 
 impl Configuration {
-    pub fn new(file: &str) -> Result<Self, ConfigError> {
+    pub fn new(file: Option<&str>) -> Result<Self, ConfigError> {
+        let args = Args::parse();
+        let conf_path = match file {
+            Some(path) => PathBuf::from(path),
+            None => args.config.unwrap_or(PathBuf::from(DEFAULT_CONFIG_PATH)),
+        };
+
         let builder = config::Config::builder()
             .set_default("global.server.port", DEFAULT_SERVER_PORT)?
             .set_default("global.metrics.port", DEFAULT_METRICS_PORT)?
@@ -504,18 +558,35 @@ impl Configuration {
             .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
             .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
             .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
-            .add_source(File::with_name(file))
+            .add_source(File::from(conf_path))
             .build()?;
 
-        let r: Result<Configuration, ConfigError> = builder.try_deserialize();
-        match r {
-            Ok(config) => {
-                CONFIGURATION.set(config.clone()).unwrap();
-                Ok(config)
-            }
-            Err(e) => Err(e),
-        }
+        let config: Result<Configuration, ConfigError> = builder.try_deserialize();
+        let mut config = match config {
+            Ok(c) => c,
+            Err(e) => return Err(e),
+        };
+
+        match args.db_path {
+            Some(p) => config.database.path = Some(p),
+            None => config.database.path = Some(PathBuf::from(DEFAULT_DB_PATH)),
+        };
+        // Set config as global
+        CONFIGURATION.set(config.clone()).unwrap();
+
+        Ok(config)
     }
+}
+
+pub fn init_logger() {
+    let args = Args::parse();
+    let log_level = match args.log_level {
+        Some(l) => l,
+        None => LogLevel::from_str(DEFAULT_LOG_LEVEL).unwrap(),
+    };
+
+    let env = Env::default().default_filter_or(format!("blockhead={}", log_level.to_string()));
+    env_logger::init_from_env(env);
 }
 
 #[cfg(test)]
@@ -525,7 +596,7 @@ mod test {
     #[tokio::test]
     async fn test_config() {
         tests::setup();
-        let config = Configuration::new("./tests/sample_config.yaml").unwrap();
+        let config = Configuration::new(Some("./tests/sample_config.yaml")).unwrap();
         println!("{:?}", config);
     }
 }

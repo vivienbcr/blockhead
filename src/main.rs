@@ -19,13 +19,12 @@ use db::Redb;
 #[macro_use]
 extern crate log;
 
-use env_logger::Env;
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let env = Env::default().default_filter_or("blockhead=trace");
-
-    match Redb::init() {
+    conf::init_logger();
+    register_custom_metrics();
+    let config = conf::Configuration::new(None).unwrap();
+    match Redb::init(&config.database) {
         Ok(_) => {
             info!("Redb db is initialized");
         }
@@ -35,10 +34,6 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    env_logger::init_from_env(env);
-    register_custom_metrics();
-
-    let config = conf::Configuration::new("config.yaml").unwrap();
     let protocols_networks = config.proto_providers.clone();
     protocols_networks.iter().for_each(|n| {
         let protocol = n.0.clone();
@@ -81,7 +76,7 @@ async fn main() -> std::io::Result<()> {
     let api = HttpServer::new(move || {
         App::new()
             .wrap(middleware::Compress::default())
-            .service(app::ping_handler)
+            .service(app::blockchain_handler)
     })
     .bind(("0.0.0.0", server_port))?
     .run();
