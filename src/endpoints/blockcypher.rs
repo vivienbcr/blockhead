@@ -1,17 +1,19 @@
 use async_trait::async_trait;
 use chrono::DateTime;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::{
     commons::blockchain::{self, Block},
-    configuration::{self, EndpointActions, NetworkName, ProtocolName},
+    conf::{self, Endpoint, EndpointActions, Protocol},
+    // configuration::{self, Endpoint, EndpointActions, NetworkName, ProtocolName},
+    requests::client::ReqwestClient,
 };
 
 use super::ProviderActions;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Blockcypher {
-    pub endpoint: configuration::Endpoint,
+    pub endpoint: Endpoint,
 }
 
 #[async_trait]
@@ -20,6 +22,9 @@ impl ProviderActions for Blockcypher {
         &mut self,
         nb_blocks: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.endpoint.available() {
+            return Err("Error: Endpoint not available".into());
+        }
         let height = self.get_chain_height().await?;
         let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
@@ -31,12 +36,19 @@ impl ProviderActions for Blockcypher {
 }
 
 impl Blockcypher {
-    pub fn new(endpoint: configuration::Endpoint) -> Blockcypher {
+    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> Blockcypher {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: network, //FIXME : use network2 instead
+            last_request: 0,
+        };
         Blockcypher { endpoint }
     }
-    pub fn test_new(url: &str, net: NetworkName) -> Self {
+    #[cfg(test)]
+    pub fn test_new(url: &str, net: crate::conf::Network) -> Self {
         Blockcypher {
-            endpoint: configuration::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, net),
         }
     }
     async fn get_chain_height(&mut self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
@@ -90,7 +102,7 @@ impl Blockcypher {
         let res = client
             .get(
                 &url,
-                &ProtocolName::Bitcoin.to_string(),
+                &Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
             .await;
@@ -166,7 +178,7 @@ mod tests {
     async fn test_get_chain_height() {
         tests::setup();
         let mut blockcypher =
-            Blockcypher::test_new("https://api.blockcypher.com", NetworkName::Mainnet);
+            Blockcypher::test_new("https://api.blockcypher.com", crate::conf::Network::Mainnet);
         let res = blockcypher.get_chain_height().await.unwrap();
         assert!(res > 0);
     }
@@ -178,7 +190,7 @@ mod tests {
         let height = 100;
         let mut blockcypher = Blockcypher::test_new(
             &env::var("BLOCKCYPHER_API_URL").unwrap(),
-            NetworkName::Mainnet,
+            crate::conf::Network::Mainnet,
         );
         let res = blockcypher
             .get_blocks_from_height(height, n_block)

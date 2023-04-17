@@ -1,8 +1,8 @@
 use reqwest::Client;
 
-use crate::configuration::EndpointOptions;
+use crate::conf::EndpointOptions;
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct ReqwestClient {
     pub client: Client,
     pub config: EndpointOptions,
@@ -16,12 +16,10 @@ impl ReqwestClient {
         }
     }
     pub async fn iddle(&self) {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            match self.config.delay {
-                Some(delay) => delay as u64,
-                None => 1,
-            }
-        ))
+        tokio::time::sleep(tokio::time::Duration::from_secs(match self.config.delay {
+            Some(delay) => delay as u64,
+            None => 1,
+        }))
         .await;
     }
 }
