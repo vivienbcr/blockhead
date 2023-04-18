@@ -1,7 +1,5 @@
 use super::client::ReqwestClient;
-use crate::{
-    configuration, prom::registry::track_response_time, prom::registry::track_status_code,
-};
+use crate::{conf, prom::registry::track_response_time, prom::registry::track_status_code};
 use serde::{Deserialize, Serialize};
 pub const JSON_RPC_VER: &str = "2.0";
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -64,11 +62,7 @@ impl ReqwestClient {
         let b = serde_json::to_string(&body).unwrap();
         debug!("RPC request: {}", &b);
         let url = self.config.url.clone().unwrap().clone();
-        for i in 0..self
-            .config
-            .retry
-            .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
-        {
+        for i in 0..self.config.retry.unwrap_or(conf::DEFAULT_ENDPOINT_RETRY) {
             let time_start = std::time::Instant::now();
             let response = self
                 .client
@@ -84,11 +78,9 @@ impl ReqwestClient {
                     &b,
                     self.config
                         .rate
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                        .unwrap_or(conf::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config
-                        .retry
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                    self.config.retry.unwrap_or(conf::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
@@ -103,11 +95,11 @@ impl ReqwestClient {
                     status,
                     self.config
                         .rate
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                        .unwrap_or(conf::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
                     self.config
                         .retry
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY),
+                        .unwrap_or(conf::DEFAULT_ENDPOINT_RETRY),
                     &b
                 );
                 self.iddle().await;
@@ -123,9 +115,7 @@ impl ReqwestClient {
         return Err(format!(
             "Error: RPC {} fail after {} retry",
             url,
-            self.config
-                .rate
-                .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+            self.config.rate.unwrap_or(conf::DEFAULT_ENDPOINT_RETRY)
         )
         .into());
     }
@@ -137,11 +127,7 @@ impl ReqwestClient {
         network: &str,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let url = url.to_string();
-        for i in 0..self
-            .config
-            .retry
-            .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
-        {
+        for i in 0..self.config.retry.unwrap_or(conf::DEFAULT_ENDPOINT_RETRY) {
             let time_start = std::time::Instant::now();
             let response = self.client.get(&url).send().await;
             let time_duration = time_start.elapsed().as_secs_f64();
@@ -151,11 +137,9 @@ impl ReqwestClient {
                     url,
                     self.config
                         .rate
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                        .unwrap_or(conf::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config
-                        .retry
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                    self.config.retry.unwrap_or(conf::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
@@ -170,11 +154,9 @@ impl ReqwestClient {
                     status,
                     self.config
                         .rate
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_REQUEST_RATE),
+                        .unwrap_or(conf::DEFAULT_ENDPOINT_REQUEST_RATE),
                     i,
-                    self.config
-                        .retry
-                        .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+                    self.config.retry.unwrap_or(conf::DEFAULT_ENDPOINT_RETRY)
                 );
                 self.iddle().await;
                 continue;
@@ -185,9 +167,7 @@ impl ReqwestClient {
         return Err(format!(
             "Error: GET {} fail after {} retry",
             url,
-            self.config
-                .rate
-                .unwrap_or(configuration::DEFAULT_ENDPOINT_RETRY)
+            self.config.rate.unwrap_or(conf::DEFAULT_ENDPOINT_RETRY)
         )
         .into());
     }

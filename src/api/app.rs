@@ -6,17 +6,22 @@ use serde_json::to_string;
 
 use crate::{
     commons::blockchain::Blockchain,
-    configuration::{get_enabled_protocol_network, NetworkName, ProtocolName},
+    conf::{get_enabled_protocol_network, Network, Protocol},
     db::DATABASE,
 };
 
 #[derive(Deserialize, Debug)]
 struct BlockchainRouteParams {
-    protocol: Option<ProtocolName>,
-    network: Option<NetworkName>,
+    protocol: Option<Protocol>,
+    network: Option<Network>,
 }
 
-type BlockchainRes = HashMap<ProtocolName, HashMap<NetworkName, Blockchain>>;
+type BlockchainRes = HashMap<Protocol, HashMap<Network, Blockchain>>;
+
+#[get("/ping")]
+async fn ping_handler() -> HttpResponse {
+    HttpResponse::Ok().body("pong")
+}
 
 #[get("/")]
 async fn blockchain_handler(params: web::Query<BlockchainRouteParams>) -> HttpResponse {
@@ -30,10 +35,10 @@ async fn blockchain_handler(params: web::Query<BlockchainRouteParams>) -> HttpRe
     // if proto param is
     if params.protocol.is_some() {
         let param_protocol = params.protocol.clone().unwrap();
-        debug!("Protocol param is {}", param_protocol.clone());
+        debug!("Protocol param is {:?}", param_protocol.clone());
         if !proto_net.contains_key(&param_protocol) {
             return HttpResponse::BadRequest()
-                .body(format!("{} protocol not found", param_protocol.clone()));
+                .body(format!("{:?} protocol not found", param_protocol.clone()));
         }
         if params.network.is_some() {
             // network should be in proto_net for that protocol
@@ -41,7 +46,7 @@ async fn blockchain_handler(params: web::Query<BlockchainRouteParams>) -> HttpRe
             let proto_net = proto_net.get(&param_protocol).unwrap().clone();
             if !proto_net.contains(&param_network) {
                 return HttpResponse::BadRequest().body(format!(
-                    "{} network not found for {} protocol",
+                    "{:?} network not found for {:?} protocol",
                     param_network, param_protocol
                 ));
             }
@@ -59,7 +64,7 @@ async fn blockchain_handler(params: web::Query<BlockchainRouteParams>) -> HttpRe
         let available_networks = proto_net.get(&param_protocol).unwrap().clone();
         for network in available_networks {
             debug!(
-                "Getting Database {} network for {} protocol",
+                "Getting Database {:?} network for {:?} protocol",
                 network,
                 param_protocol.clone()
             );

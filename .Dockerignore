@@ -2,3 +2,4 @@ target
 bh.redb
 config.yaml
 *.json
+*.env

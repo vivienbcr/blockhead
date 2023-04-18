@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, path::PathBuf};
 
 use once_cell::sync::OnceCell;
 use redb::{Database, ReadableTable, TableDefinition};
@@ -7,7 +7,7 @@ use std::io;
 
 use crate::{
     commons::blockchain::{self, Block},
-    configuration::{NetworkName, ProtocolName, CONFIGURATION},
+    conf::{self, Network, Protocol, CONFIGURATION, DEFAULT_DB_PATH},
 };
 const TABLE: TableDefinition<&str, &str> = TableDefinition::new("blockchain");
 pub static DATABASE: OnceCell<Redb> = OnceCell::new();
@@ -16,9 +16,14 @@ pub struct Redb {
     db: Database,
 }
 impl Redb {
-    pub fn init() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn init(db_conf: &conf::Database) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb::new");
-        let db = Database::open("bh_db.redb");
+        let path = db_conf
+            .path
+            .clone()
+            .unwrap_or(PathBuf::from(DEFAULT_DB_PATH));
+        println!("Redb::new() path {:?}", path);
+        let db = Database::open(&path);
         match db {
             Ok(db) => {
                 info!("Redb::new() db is ok");
@@ -32,7 +37,7 @@ impl Redb {
                         match io_error.kind() {
                             io::ErrorKind::NotFound => {
                                 info!("Redb db is not found, create new one");
-                                let db = Database::create("bh.redb");
+                                let db = Database::create(&path);
                                 match db {
                                     Ok(db) => {
                                         info!("Redb db is created");
@@ -75,13 +80,13 @@ impl Redb {
         write_txn.commit()?;
         Ok(())
     }
-    fn to_db_key(protocol: &ProtocolName, network: &NetworkName) -> String {
+    fn to_db_key(protocol: &Protocol, network: &Network) -> String {
         format!("{}-{}", protocol.to_string(), network.to_string())
     }
     pub fn get_blockchain(
         &self,
-        protocol: &ProtocolName,
-        network: &NetworkName,
+        protocol: &Protocol,
+        network: &Network,
     ) -> Result<blockchain::Blockchain, Box<dyn Error + Send + Sync>> {
         debug!("Redb get_blockchain({:?},{:?})", protocol, network);
         let read_txn = self.db.begin_read()?;
@@ -103,8 +108,8 @@ impl Redb {
     pub fn set_blockchain(
         &self,
         blockchain: &blockchain::Blockchain,
-        protocol: &ProtocolName,
-        network: &NetworkName,
+        protocol: &Protocol,
+        network: &Network,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb set_blockchain({:?},{:?})", protocol, network);
         let chain_db = self.get_blockchain(&protocol, &network);

@@ -3,14 +3,15 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
-    configuration::{self, EndpointActions},
+    conf::{self, Endpoint, EndpointActions},
+    requests::client::ReqwestClient,
 };
 
 use super::ProviderActions;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Blockstream {
-    pub endpoint: configuration::Endpoint,
+    pub endpoint: Endpoint,
 }
 
 #[async_trait]
@@ -19,6 +20,9 @@ impl ProviderActions for Blockstream {
         &mut self,
         nb_blocks: u32,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.endpoint.available() {
+            return Err("Error: Endpoint not available".into());
+        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let mut height = self.get_chain_height().await?;
         let mut blocks = self.get_blocks_from_height(height).await?;
@@ -45,7 +49,13 @@ impl ProviderActions for Blockstream {
 }
 
 impl Blockstream {
-    pub fn new(endpoint: configuration::Endpoint) -> Blockstream {
+    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> Blockstream {
+        let endpoint = Endpoint {
+            url: options.url.clone().unwrap(),
+            reqwest: Some(ReqwestClient::new(options)),
+            network: network,
+            last_request: 0,
+        };
         Blockstream { endpoint }
     }
     async fn get_blocks_from_height(
@@ -69,7 +79,7 @@ impl Blockstream {
         let res = reqwest
             .get(
                 url,
-                &configuration::ProtocolName::Bitcoin.to_string(),
+                &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
             .await;
