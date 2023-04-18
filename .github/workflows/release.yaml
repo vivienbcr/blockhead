@@ -24,6 +24,4 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: vivienbcr/blockhead:${{ GITHUB_REF_NAME }},vivienbcr/blockhead:latest
-        
-
+          tags: vivienbcr/blockhead:${{ github.ref_name }},vivienbcr/blockhead:latest
