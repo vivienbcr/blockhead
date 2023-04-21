@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf};
+use std::error::Error;
 
 use once_cell::sync::OnceCell;
 use redb::{Database, ReadableTable, TableDefinition};
@@ -7,7 +7,7 @@ use std::io;
 
 use crate::{
     commons::blockchain::{self, Block},
-    conf::{self, Network, Protocol, CONFIGURATION, DEFAULT_DB_PATH},
+    conf::{self, Network, Protocol, CONFIGURATION},
 };
 const TABLE: TableDefinition<&str, &str> = TableDefinition::new("blockchain");
 pub static DATABASE: OnceCell<Redb> = OnceCell::new();
@@ -18,10 +18,7 @@ pub struct Redb {
 impl Redb {
     pub fn init(db_conf: &conf::Database) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb::new");
-        let path = db_conf
-            .path
-            .clone()
-            .unwrap_or(PathBuf::from(DEFAULT_DB_PATH));
+        let path = db_conf.path.clone();
         println!("Redb::new() path {:?}", path);
         let db = Database::open(&path);
         match db {

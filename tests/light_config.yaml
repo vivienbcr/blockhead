@@ -1,0 +1,6 @@
+protocols:
+  bitcoin:
+    mainnet:
+      rpc:
+      - url: https://rpc-bitcoin-1.com
+      - url: https://rpc-bitcoin-2.com

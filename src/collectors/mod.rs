@@ -22,8 +22,7 @@ pub async fn runner(
     );
     let mut providers = providers;
 
-    let mut interval =
-        tokio::time::interval(Duration::from_secs(net_opts.tick_rate.unwrap() as u64));
+    let mut interval = tokio::time::interval(Duration::from_secs(net_opts.tick_rate as u64));
     loop {
         // get all providers that implement ProviderActions
         let mut providers_d: Vec<Box<&mut dyn ProviderActions>> = Vec::new();
@@ -36,7 +35,7 @@ pub async fn runner(
         // batch all tasks
         let tasks = providers_d
             .iter_mut()
-            .map(|p| p.parse_top_blocks(net_opts.head_length.unwrap()));
+            .map(|p| p.parse_top_blocks(net_opts.head_length));
         let results = futures::future::join_all(tasks).await;
         // filter out errors
         let results = results

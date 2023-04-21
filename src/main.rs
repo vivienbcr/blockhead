@@ -21,9 +21,9 @@ extern crate log;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    conf::init_logger();
+    conf::init_logger(None);
     register_custom_metrics();
-    let config = conf::Configuration::new(None).unwrap();
+    let config = conf::Configuration::new(None, None, true).unwrap();
     match Redb::init(&config.database) {
         Ok(_) => {
             info!("Redb db is initialized");

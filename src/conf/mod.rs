@@ -15,6 +15,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::{
     collections::HashMap,
+    ffi::OsString,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -61,6 +62,7 @@ pub fn get_enabled_protocol_network() -> HashMap<Protocol, Vec<Network>> {
     }
     res
 }
+
 /**
  * Deserialize configuration is used to be sure global configuration will be deserialized first
  * global configuration set some default values wich endpoint will reuse at their initialization
@@ -100,17 +102,24 @@ where
     D: Deserializer<'de>,
 {
     let v: Value = Deserialize::deserialize(deserializer)?;
-    // proto_opts store network options for each protocol
+    /*
+     * proto_opts store network options for each protocol
+     */
     let mut proto_opts: ProtocolsNetworksOpts = HashMap::new();
-    // proto_providers store providers for each protocol
+    /*
+     * proto_providers store providers for each protocol
+     */
     let mut proto_providers: ProtocolsNetworksProviders = HashMap::new();
-    // Deserialize protocols
+    /*
+     * Deserialize protocols
+     * For each protocol we deserialize network options and providers
+     */
     v.as_object()
         .unwrap()
         .iter()
         .for_each(|(proto, proto_config)| {
             debug!("Deserialize protocol {}", proto);
-            let mut net_opts: NetworkOptions = HashMap::new();
+
             let mut net_providers: NetworkProvider = HashMap::new();
             let protocol = Protocol::from(proto.clone());
             let protocol = match protocol {
@@ -119,7 +128,11 @@ where
                     panic!("Unkonwn protocol: {} found in configuration file", proto)
                 }
             };
-            // Deserialise Network
+            let mut net_opts: NetworkOptions = HashMap::new();
+            /*
+             * Deserialize networks
+             * For each network we deserialize network options and providers
+             */
             let s: Value = serde_json::from_str(&proto_config.to_string()).unwrap();
             s.as_object().unwrap().iter().for_each(|(net, opts)| {
                 debug!("Deserialize network {}", net);
@@ -130,20 +143,33 @@ where
                         panic!("Unkonwn protocol: {} found in configuration file", proto)
                     }
                 };
-                // Deserialize providers and network options
-                let mut providers = Vec::new();
                 let o: Value = serde_json::from_str(&opts.to_string()).unwrap();
+                /*
+                 * Deserialize Network options
+                 */
+                let network_option_field = o.as_object().unwrap().get("network_options");
+                match network_option_field {
+                    Some(opt) => {
+                        let mut net_opt = global.networks_options.clone();
+                        net_opt
+                            .from_network_option_file(
+                                &NetworkAppOptionsConfigF::deserialize(opt).unwrap(),
+                            )
+                            .unwrap();
+                        net_opts.insert(network.clone(), net_opt);
+                    }
+                    None => {
+                        net_opts.insert(network.clone(), global.networks_options.clone());
+                    }
+                }
+                /*
+                 * Deserialize providers
+                 */
+                let mut providers = Vec::new();
                 o.as_object().unwrap().iter().for_each(|(provider, opt)| {
                     let endpoints_options: Value = serde_json::from_str(&opt.to_string()).unwrap();
                     match provider.as_str() {
-                        // At deserialization, if user specify network options we merge them with global options
-                        "network_options" => {
-                            let mut net_opt = global.networks_options.clone();
-                            net_opt
-                                .merge(NetworkAppOptions::deserialize(opt).unwrap())
-                                .unwrap();
-                            net_opts.insert(network.clone(), net_opt);
-                        }
+                        "network_options" => {}
                         // Rpc is vec of provider declaration,
                         "rpc" => {
                             debug!("Found rpc {}", provider);
@@ -153,19 +179,18 @@ where
                                 .iter()
                                 .for_each(|endpoint| {
                                     // merge endpoint options with global endpoint options
-                                    println!("endpoint: {:?}", endpoint);
                                     let provider_config_f =
                                         ProviderConfigF::deserialize(endpoint).unwrap();
 
-                                    let endpoint_opts =
-                                        EndpointOptions::from_provider_config_f(provider_config_f);
-                                    let mut default_endpoint_opt = global.endpoints.clone();
+                                    let endpoint_opts = EndpointOptions::from_provider_config_f(
+                                        provider_config_f,
+                                        &global.endpoints,
+                                    );
 
-                                    default_endpoint_opt.merge(endpoint_opts).unwrap();
-                                    debug!("endpoint_opt: {:?}", default_endpoint_opt);
+                                    debug!("endpoint_opt: {:?}", endpoint_opts);
                                     let rpc_provider = Provider::from_str(
                                         &format!("{}_node", protocol.to_string()),
-                                        default_endpoint_opt,
+                                        endpoint_opts,
                                         &network,
                                     );
                                     providers.push(rpc_provider);
@@ -174,17 +199,20 @@ where
                         // Str is a provider declaration
                         str => {
                             debug!("Found provider {}", str);
-                            let provider_config_f = ProviderConfigF::deserialize(opt).unwrap();
-                            let endpoint_opts =
-                                EndpointOptions::from_provider_config_f(provider_config_f);
-                            let mut default_endpoint_opt = global.endpoints.clone();
-
-                            default_endpoint_opt.merge(endpoint_opts).unwrap();
-                            debug!("endpoint_opt: {:?}", default_endpoint_opt);
-
-                            let provider = Provider::from_str(str, default_endpoint_opt, &network);
-                            debug!("provider: {:?}", provider);
-                            providers.push(provider);
+                            if Provider::is_available(provider) {
+                                let provider_config_f = ProviderConfigF::deserialize(opt).unwrap();
+                                let endpoint_opts = EndpointOptions::from_provider_config_f(
+                                    provider_config_f,
+                                    &global.endpoints,
+                                );
+                                let provider = Provider::from_str(str, endpoint_opts, &network);
+                                providers.push(provider);
+                            } else {
+                                panic!(
+                                    "Provider {} is not available for {:?} {:?} ",
+                                    str, protocol, network
+                                );
+                            }
                         }
                     }
                 });
@@ -197,11 +225,6 @@ where
                 net_providers.insert(network.clone(), providers);
             });
             // After deserialization, if user didn't specify network options we use global options
-            if net_opts.is_empty() {
-                let net_opt = global.networks_options.clone();
-                net_opts.insert(Network::Mainnet, net_opt);
-            }
-
             proto_opts.insert(protocol.clone(), net_opts);
             proto_providers.insert(protocol.clone(), net_providers);
         });
@@ -215,6 +238,8 @@ where
  */
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Global {
+    #[serde(rename(deserialize = "options"))]
+    #[serde(default)]
     pub endpoints: EndpointOptions,
     pub networks_options: NetworkAppOptions,
     pub metrics: Metrics,
@@ -231,9 +256,19 @@ pub struct Server {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Database {
+    #[serde(default = "default_database_keep_history")]
     pub keep_history: u32,
-    #[serde(skip)]
-    pub path: Option<PathBuf>,
+    #[serde(default = "default_database_path")]
+    #[serde(deserialize_with = "deserialize_path")]
+    pub path: PathBuf,
+}
+
+fn deserialize_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: &str = Deserialize::deserialize(deserializer)?;
+    Ok(PathBuf::from(s))
 }
 
 #[derive(Debug, Clone)]
@@ -244,6 +279,51 @@ pub enum Provider {
     EthereumNode(EthereumNode),
     None,
 }
+#[cfg(test)]
+pub fn get_bitcoin_nodes(providers: &Vec<Provider>) -> Vec<&BitcoinNode> {
+    let mut bitcoin_nodes = Vec::new();
+    for provider in providers {
+        match provider {
+            Provider::BitcoinNode(node) => bitcoin_nodes.push(node),
+            _ => (),
+        }
+    }
+    bitcoin_nodes
+}
+#[cfg(test)]
+pub fn get_blockstream(providers: &Vec<Provider>) -> Vec<&Blockstream> {
+    let mut blockstream = Vec::new();
+    for provider in providers {
+        match provider {
+            Provider::Blockstream(node) => blockstream.push(node),
+            _ => (),
+        }
+    }
+    blockstream
+}
+#[cfg(test)]
+pub fn get_blockcypher(providers: &Vec<Provider>) -> Vec<&Blockcypher> {
+    let mut blockcypher = Vec::new();
+    for provider in providers {
+        match provider {
+            Provider::Blockcypher(node) => blockcypher.push(node),
+            _ => (),
+        }
+    }
+    blockcypher
+}
+#[cfg(test)]
+pub fn get_ethereum_nodes(providers: &Vec<Provider>) -> Vec<&EthereumNode> {
+    let mut ethereum_nodes = Vec::new();
+    for provider in providers {
+        match provider {
+            Provider::EthereumNode(node) => ethereum_nodes.push(node),
+            _ => (),
+        }
+    }
+    ethereum_nodes
+}
+
 impl Provider {
     pub fn from_str(provider: &str, endpoint_opt: EndpointOptions, network: &Network) -> Provider {
         let n = network.to_owned();
@@ -255,15 +335,22 @@ impl Provider {
             _ => Provider::None,
         }
     }
-
     pub fn as_mut_provider_actions(&mut self) -> Option<&mut dyn ProviderActions> {
         match self {
             Provider::Blockstream(provider) => Some(provider),
             Provider::Blockcypher(provider) => Some(provider),
             Provider::BitcoinNode(provider) => Some(provider),
             Provider::EthereumNode(provider) => Some(provider),
-            // Provider::None => None,
             _ => None,
+        }
+    }
+    pub fn is_available(provider: &str) -> bool {
+        match provider {
+            "blockstream" => true,
+            "blockcypher" => true,
+            "bitcoin_node" => true,
+            "ethereum_node" => true,
+            _ => false,
         }
     }
 }
@@ -272,22 +359,32 @@ impl Provider {
 pub enum EthereumProviders {
     Rpc(Vec<EthereumNode>),
 }
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct NetworkAppOptionsConfigF {
+    pub head_length: Option<u32>,
+    pub tick_rate: Option<u32>,
+}
 /**
  * Network options is used to define network specific options
  * With this you can fine tune the network scraping params on your needs
  */
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NetworkAppOptions {
-    pub head_length: Option<u32>,
-    pub tick_rate: Option<u32>,
+    #[serde(default = "default_head_length")]
+    pub head_length: u32,
+    #[serde(default = "default_tick_rate")]
+    pub tick_rate: u32,
 }
 impl NetworkAppOptions {
-    pub fn merge(&mut self, other: NetworkAppOptions) -> Result<(), ConfigError> {
-        if let Some(head_length) = other.head_length {
-            self.head_length = Some(head_length);
+    pub fn from_network_option_file(
+        &mut self,
+        network_option_file: &NetworkAppOptionsConfigF,
+    ) -> Result<(), ConfigError> {
+        if let Some(head_length) = network_option_file.head_length {
+            self.head_length = head_length;
         }
-        if let Some(tick_rate) = other.tick_rate {
-            self.tick_rate = Some(tick_rate);
+        if let Some(tick_rate) = network_option_file.tick_rate {
+            self.tick_rate = tick_rate;
         }
         Ok(())
     }
@@ -309,73 +406,67 @@ pub struct ProviderConfigF {
 
 /**
  * Endpoint options is used to define reqwest client options
+ * Don't reuse EndpointOptionsConfigF to avoid Option<Option<T>> everywhere
+ * Endpoint options if not defined in config file will be set to default values
  */
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct EndpointOptions {
     pub url: Option<String>,
-    pub retry: Option<u32>,
-    pub delay: Option<u32>,
-    pub rate: Option<u32>,
+    #[serde(default = "default_endpoint_retry")]
+    pub retry: u32,
+    #[serde(default = "default_endpoint_delay")]
+    pub delay: u32,
+    #[serde(default = "default_endpoint_request_rate")]
+    pub rate: u32,
 }
 impl Default for EndpointOptions {
     fn default() -> Self {
-        let mut e = EndpointOptions {
-            url: None,
-            retry: Some(DEFAULT_ENDPOINT_RETRY),
-            delay: Some(DEFAULT_ENDPOINT_DELAY),
-            rate: Some(DEFAULT_ENDPOINT_REQUEST_RATE),
-        };
         let global = CONFIGURATION.get();
         match global {
-            Some(g) => {
-                e.merge(g.global.endpoints.clone()).unwrap_or(());
-            }
-            None => (),
+            Some(g) => g.global.endpoints.clone(),
+            None => EndpointOptions {
+                url: None,
+                retry: DEFAULT_ENDPOINT_RETRY,
+                delay: DEFAULT_ENDPOINT_DELAY,
+                rate: DEFAULT_ENDPOINT_REQUEST_RATE,
+            },
         }
-        e
     }
 }
 impl EndpointOptions {
-    pub fn from_provider_config_f(provider: ProviderConfigF) -> EndpointOptions {
-        let mut endpoint_opt = EndpointOptions::default();
+    /**
+     * from_provider_config_f is used to create EndpointOptions from ProviderConfigF
+     * Take global options and override values specified in ProviderConfigF
+     * Global is required because Default trait will not consider global config override
+     */
+    pub fn from_provider_config_f(
+        provider: ProviderConfigF,
+        global: &EndpointOptions,
+    ) -> EndpointOptions {
+        let mut endpoint_opt = global.clone();
         if let Some(url) = provider.url {
             endpoint_opt.url = Some(url);
         }
         if let Some(options) = provider.options {
             if let Some(retry) = options.retry {
-                endpoint_opt.retry = Some(retry);
+                endpoint_opt.retry = retry;
             }
             if let Some(delay) = options.delay {
-                endpoint_opt.delay = Some(delay);
+                endpoint_opt.delay = delay;
             }
             if let Some(rate) = options.rate {
-                endpoint_opt.rate = Some(rate);
+                endpoint_opt.rate = rate;
             }
         }
         endpoint_opt
-    }
-    pub fn merge(&mut self, other: EndpointOptions) -> Result<(), ConfigError> {
-        if let Some(url) = other.url {
-            self.url = Some(url);
-        }
-        if let Some(retry) = other.retry {
-            self.retry = Some(retry);
-        }
-        if let Some(delay) = other.delay {
-            self.delay = Some(delay);
-        }
-        if let Some(rate) = other.rate {
-            self.rate = Some(rate);
-        }
-        Ok(())
     }
     #[cfg(test)]
     pub fn test_new(url: &str) -> Self {
         EndpointOptions {
             url: Some(url.to_string()),
-            retry: Some(3),
-            delay: Some(1),
-            rate: Some(5),
+            retry: 3,
+            delay: 1,
+            rate: 5,
         }
     }
 }
@@ -479,7 +570,7 @@ impl EndpointActions for Endpoint {
             .expect("Time went backwards")
             .as_secs();
         let diff = now - self.last_request;
-        if diff < self.reqwest.clone().unwrap().config.rate.unwrap() as u64 {
+        if diff < self.reqwest.clone().unwrap().config.rate as u64 {
             debug!("Rate limit reached for {} ({}s)", self.url, diff);
             return false;
         }
@@ -523,27 +614,63 @@ impl LogLevel {
 struct Args {
     #[arg(short, long, value_enum, default_value = "info")]
     log_level: Option<LogLevel>,
-    #[arg(short, long, default_value = DEFAULT_DB_PATH)]
+    #[arg(short, long)]
     db_path: Option<PathBuf>,
     #[arg(short, long, default_value = DEFAULT_CONFIG_PATH)]
     config: Option<PathBuf>,
 }
 
-pub const DEFAULT_SERVER_PORT: u32 = 8080;
+pub const DEFAULT_SERVER_PORT: u16 = 8080;
+pub fn default_server_port() -> u16 {
+    DEFAULT_SERVER_PORT
+}
 pub const DEFAULT_METRICS_PORT: u16 = 8081;
+pub fn default_metrics_port() -> u16 {
+    DEFAULT_SERVER_PORT
+}
 pub const DEFAULT_HEAD_LENGTH: u32 = 5;
+pub fn default_head_length() -> u32 {
+    DEFAULT_HEAD_LENGTH
+}
 pub const DEFAULT_TICK_RATE: u32 = 5;
+pub fn default_tick_rate() -> u32 {
+    DEFAULT_TICK_RATE
+}
 pub const DEFAULT_ENDPOINT_RETRY: u32 = 3;
+fn default_endpoint_retry() -> u32 {
+    DEFAULT_ENDPOINT_RETRY
+}
 pub const DEFAULT_ENDPOINT_DELAY: u32 = 1;
+fn default_endpoint_delay() -> u32 {
+    DEFAULT_ENDPOINT_DELAY
+}
 pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
+fn default_endpoint_request_rate() -> u32 {
+    DEFAULT_ENDPOINT_REQUEST_RATE
+}
 pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
+fn default_database_keep_history() -> u32 {
+    DEFAULT_DATABASE_KEEP_HISTORY
+}
 pub const DEFAULT_CONFIG_PATH: &str = "config.yaml";
-pub const DEFAULT_DB_PATH: &str = "blockhead.db";
+
+pub const DEFAULT_DATABASE_PATH: &str = "blockhead.db";
+fn default_database_path() -> PathBuf {
+    PathBuf::from(DEFAULT_DATABASE_PATH)
+}
+
 pub const DEFAULT_LOG_LEVEL: &str = "info";
 
 impl Configuration {
-    pub fn new(file: Option<&str>) -> Result<Self, ConfigError> {
-        let args = Args::parse();
+    pub fn new(
+        file: Option<&str>,
+        args: Option<Vec<OsString>>,
+        init: bool,
+    ) -> Result<Self, ConfigError> {
+        let args = match args {
+            Some(args) => Args::parse_from(args),
+            None => Args::parse(),
+        };
         let conf_path = match file {
             Some(path) => PathBuf::from(path),
             None => args.config.unwrap_or(PathBuf::from(DEFAULT_CONFIG_PATH)),
@@ -566,20 +693,23 @@ impl Configuration {
             Ok(c) => c,
             Err(e) => return Err(e),
         };
-
         match args.db_path {
-            Some(p) => config.database.path = Some(p),
-            None => config.database.path = Some(PathBuf::from(DEFAULT_DB_PATH)),
+            Some(p) => config.database.path = p,
+            None => {}
         };
-        // Set config as global
-        CONFIGURATION.set(config.clone()).unwrap();
-
+        if init {
+            // Set config as global
+            CONFIGURATION.set(config.clone()).unwrap();
+        }
         Ok(config)
     }
 }
 
-pub fn init_logger() {
-    let args = Args::parse();
+pub fn init_logger(args: Option<Vec<OsString>>) {
+    let args = match args {
+        Some(args) => Args::parse_from(args),
+        None => Args::parse(),
+    };
     let log_level = match args.log_level {
         Some(l) => l,
         None => LogLevel::from_str(DEFAULT_LOG_LEVEL).unwrap(),
@@ -591,12 +721,415 @@ pub fn init_logger() {
 
 #[cfg(test)]
 mod test {
-    use crate::{conf::Configuration, tests};
+    use crate::{conf::*, tests};
+    use std::ffi::OsString;
+    #[test]
+    // test_config_endpoint
 
-    #[tokio::test]
-    async fn test_config() {
+    fn conf_struct_endpoint_options() {
+        let endpoint = EndpointOptions::default();
+        assert_eq!(endpoint.url, None, "url should be empty");
+        assert_eq!(
+            endpoint.retry, DEFAULT_ENDPOINT_RETRY,
+            "retry should match with default value"
+        );
+        assert_eq!(
+            endpoint.delay, DEFAULT_ENDPOINT_DELAY,
+            "delay should match with default value"
+        );
+        assert_eq!(
+            endpoint.rate, DEFAULT_ENDPOINT_REQUEST_RATE,
+            "rate should match with default value"
+        );
+
+        let provider_options_f = ProviderOptsConfigF {
+            retry: Some(40),
+            delay: None,
+            rate: Some(60),
+        };
+
+        let provider_config_f = ProviderConfigF {
+            options: Some(provider_options_f),
+            url: Some("http://localhost:8080".to_string()),
+        };
+
+        let merge = EndpointOptions::from_provider_config_f(provider_config_f, &endpoint);
+        assert_eq!(
+            merge.url,
+            Some("http://localhost:8080".to_string()),
+            "url should be set"
+        );
+        assert_eq!(merge.retry, 40, "retry should match with overriden value");
+        assert_eq!(
+            merge.delay, DEFAULT_ENDPOINT_DELAY,
+            "delay should not change"
+        );
+        assert_eq!(merge.rate, 60, "rate should match with overriden value");
+    }
+
+    #[test]
+    // test_config_full tests the full configuration file with overwrites all default values
+    fn conf_full() {
         tests::setup();
-        let config = Configuration::new(Some("./tests/sample_config.yaml")).unwrap();
-        println!("{:?}", config);
+        // should override os params for tests
+        let args = vec![OsString::from("blockhead")];
+        let config =
+            Configuration::new(Some("./tests/full_config.yaml"), Some(args), false).unwrap();
+
+        // Test network_options
+        assert_eq!(
+            config.global.networks_options.head_length, 1,
+            "head_length should be set to 1"
+        );
+        assert_eq!(
+            config.global.networks_options.tick_rate, 2,
+            "tick_rate should be set to 2"
+        );
+        // Test endpoints
+        assert_eq!(
+            config.global.endpoints.retry, 33,
+            "retry should be set to 33"
+        );
+        assert_eq!(
+            config.global.endpoints.delay, 44,
+            "delay should be set to 44"
+        );
+        assert_eq!(config.global.endpoints.rate, 55, "rate should be set to 55");
+        assert_eq!(config.global.endpoints.url, None, "url should be empty");
+        // test api server options
+        assert_eq!(config.global.server.port, 6, "port should be set to 6");
+        assert_eq!(
+            config.global.metrics.port, 7,
+            "metrics port should be set to 7"
+        );
+
+        // test database options
+        assert_eq!(
+            config.database.keep_history, 88,
+            "keep_history should be set to 88"
+        );
+
+        assert_eq!(
+            config.database.path,
+            PathBuf::from("/some/path/file.db"),
+            "db path should be set to /some/path/file.db"
+        );
+
+        // Test bitcoin provider
+        let bitcoin_net_provider = config.proto_providers.get(&Protocol::Bitcoin).unwrap();
+        let bitcoin_mainnet_providers = bitcoin_net_provider.get(&Network::Mainnet).unwrap();
+        assert_eq!(
+            bitcoin_mainnet_providers.len(),
+            4,
+            "should have 4 provider for bitcoin mainnet"
+        );
+        let bitcoin_mainnet_rpc_urls = vec![
+            "https://rpc-bitcoin-mainnet-1.com",
+            "https://rpc-bitcoin-mainnet-2.com",
+        ];
+        let bitcoin_mainnet_rpc_providers = get_bitcoin_nodes(bitcoin_mainnet_providers);
+        // Test first bitcoin mainnet rpc url
+        let b = bitcoin_mainnet_rpc_providers
+            .iter()
+            .find(|x| x.endpoint.url == bitcoin_mainnet_rpc_urls[0]);
+        assert_eq!(
+            b.is_some(),
+            true,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+        let e = b.unwrap().endpoint.clone();
+        let e = e.reqwest.unwrap();
+        assert_eq!(
+            e.config.rate, config.global.endpoints.rate,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+        assert_eq!(
+            e.config.retry, config.global.endpoints.retry,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+        assert_eq!(
+            e.config.delay, config.global.endpoints.delay,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+
+        // Test second bitcoin mainnet rpc url with overriden values
+        let b = bitcoin_mainnet_rpc_providers
+            .iter()
+            .find(|x| x.endpoint.url == bitcoin_mainnet_rpc_urls[1]);
+        assert_eq!(
+            b.is_some(),
+            true,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+
+        let e = b.unwrap().endpoint.clone();
+        let e = e.reqwest.unwrap();
+        assert_eq!(
+            e.config.rate, 15,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+        assert_eq!(
+            e.config.retry, 13,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+        assert_eq!(
+            e.config.delay, 14,
+            "First Bitcoin mainnet rpc url should be set"
+        );
+        // Test bitcoin mainnet blockstream
+        let bitcoin_mainnet_blockstream_url = "https://sample-url-3.com";
+        let bitcoin_mainnet_blockstream_providers = get_blockstream(bitcoin_mainnet_providers);
+        let b = bitcoin_mainnet_blockstream_providers
+            .iter()
+            .find(|x| x.endpoint.url == bitcoin_mainnet_blockstream_url);
+        assert_eq!(
+            b.is_some(),
+            true,
+            "Bitcoin mainnet blockstream url should be set"
+        );
+        let e = b.unwrap().endpoint.clone();
+        let e = e.reqwest.unwrap();
+        assert_eq!(
+            e.config.rate, 16,
+            "Bitcoin mainnet blockstream url should be set"
+        );
+        assert_eq!(
+            e.config.retry, 17,
+            "Bitcoin mainnet blockstream url should be set"
+        );
+        assert_eq!(
+            e.config.delay, 18,
+            "Bitcoin mainnet blockstream url should be set"
+        );
+        // Test bitcoin blockcypher
+        let bitcoin_mainnet_blockcypher_url = "https://sample-url-4.com";
+        let bitcoin_mainnet_blockcypher_providers = get_blockcypher(bitcoin_mainnet_providers);
+        let b = bitcoin_mainnet_blockcypher_providers
+            .iter()
+            .find(|x| x.endpoint.url == bitcoin_mainnet_blockcypher_url);
+        assert_eq!(
+            b.is_some(),
+            true,
+            "Bitcoin mainnet blockcypher url should be set"
+        );
+        let e = b.unwrap().endpoint.clone();
+        let e = e.reqwest.unwrap();
+        assert_eq!(
+            e.config.rate, 19,
+            "Bitcoin mainnet blockcypher url should be set"
+        );
+        assert_eq!(
+            e.config.retry, 20,
+            "Bitcoin mainnet blockcypher url should be set"
+        );
+        assert_eq!(
+            e.config.delay, 21,
+            "Bitcoin mainnet blockcypher url should be set"
+        );
+        let bitcoin_network_options = config.proto_opts.get(&Protocol::Bitcoin).unwrap();
+        let bitcoin_mainnet_network_options =
+            bitcoin_network_options.get(&Network::Mainnet).unwrap();
+        assert_eq!(
+            bitcoin_mainnet_network_options.head_length, 9,
+            "Bitcoin mainnet head_length should be set to 9"
+        );
+        // Test ethereum provider
+        let ethereum_net_provider = config.proto_providers.get(&Protocol::Ethereum).unwrap();
+        let ethereum_mainnet_providers = ethereum_net_provider.get(&Network::Mainnet).unwrap();
+        assert_eq!(
+            ethereum_mainnet_providers.len(),
+            1,
+            "should have 1 provider for ethereum mainnet"
+        );
+        let ethereum_mainnet_rpc_urls = vec!["https://rpc-ethereum-5.com"];
+        let ethereum_mainnet_rpc_providers = get_ethereum_nodes(ethereum_mainnet_providers);
+        // Test first ethereum mainnet rpc url
+        let b = ethereum_mainnet_rpc_providers
+            .iter()
+            .find(|x| x.endpoint.url == ethereum_mainnet_rpc_urls[0]);
+        assert_eq!(
+            b.is_some(),
+            true,
+            "First Ethereum mainnet rpc url should be set"
+        );
+        let e = b.unwrap().endpoint.clone();
+        let e = e.reqwest.unwrap();
+        assert_eq!(
+            e.config.retry, 22,
+            "First Ethereum mainnet retry should be equal to 22"
+        );
+        assert_eq!(
+            e.config.delay, 23,
+            "First Ethereum mainnet delay should be equal to 23"
+        );
+        assert_eq!(
+            e.config.rate, 24,
+            "First Ethereum mainnet rate should be equal to 24"
+        );
+        let ethereum_network_options = config.proto_opts.get(&Protocol::Ethereum).unwrap();
+        let ethereum_mainnet_network_options =
+            ethereum_network_options.get(&Network::Mainnet).unwrap();
+        assert_eq!(
+            ethereum_mainnet_network_options.head_length,
+            config.global.networks_options.head_length,
+            "Ethereum mainnet head_length should be eq to global head_length"
+        );
+        assert_eq!(
+            ethereum_mainnet_network_options.tick_rate, config.global.networks_options.tick_rate,
+            "Ethereum mainnet tick_rate should be eq to global tick_rate"
+        );
+        // Test Ethereum sepolia
+        let ethereum_sepolia_providers = ethereum_net_provider.get(&Network::Sepolia).unwrap();
+        assert_eq!(
+            ethereum_sepolia_providers.len(),
+            1,
+            "should have 1 provider for ethereum sepolia"
+        );
+        let ethereum_sepolia_rpc_urls = vec!["https://rpc-ethereum-6.com"];
+        let ethereum_sepolia_rpc_providers = get_ethereum_nodes(ethereum_sepolia_providers);
+        // Test first ethereum sepolia rpc url
+        let b = ethereum_sepolia_rpc_providers
+            .iter()
+            .find(|x| x.endpoint.url == ethereum_sepolia_rpc_urls[0]);
+        assert_eq!(
+            b.is_some(),
+            true,
+            "First Ethereum sepolia rpc url should be set"
+        );
+        let e = b.unwrap().endpoint.clone();
+        let e = e.reqwest.unwrap();
+        assert_eq!(
+            e.config.retry, 25,
+            "First Ethereum sepolia retry should be equal to 25"
+        );
+        assert_eq!(
+            e.config.delay, 26,
+            "First Ethereum sepolia delay should be equal to 26"
+        );
+        assert_eq!(
+            e.config.rate, 27,
+            "First Ethereum sepolia rate should be equal to 27"
+        );
+        let ethereum_sepolia_network_options =
+            ethereum_network_options.get(&Network::Sepolia).unwrap();
+        assert_eq!(
+            ethereum_sepolia_network_options.head_length, config.global.networks_options.head_length,
+            "Ethereum sepolia head_length should be set to config.global.networks_options.head_length"
+        );
+        assert_eq!(
+            ethereum_sepolia_network_options.tick_rate, config.global.networks_options.tick_rate,
+            "Ethereum sepolia tick_rate should be set to config.global.networks_options.tick_rate"
+        );
+    }
+
+    #[test]
+    fn conf_simple() {
+        // tests::setup();
+        let args = vec![OsString::from("blockhead")];
+        let config =
+            Configuration::new(Some("./tests/light_config.yaml"), Some(args), false).unwrap();
+
+        // Global values should match defaults
+        assert_eq!(
+            config.global.endpoints.rate, DEFAULT_ENDPOINT_REQUEST_RATE,
+            "rate should be set to default value"
+        );
+        assert_eq!(
+            config.global.endpoints.retry, DEFAULT_ENDPOINT_RETRY,
+            "retry should be set to default value"
+        );
+        assert_eq!(
+            config.global.endpoints.delay, DEFAULT_ENDPOINT_DELAY,
+            "delay should be set to default value"
+        );
+        assert_eq!(
+            config.global.server.port, DEFAULT_SERVER_PORT,
+            "server port should be set to default value"
+        );
+        assert_eq!(
+            config.global.metrics.port, DEFAULT_METRICS_PORT,
+            "metrics port should be set to default value"
+        );
+        assert_eq!(
+            config.global.networks_options.head_length, DEFAULT_HEAD_LENGTH,
+            "head_length should be set to default value"
+        );
+        assert_eq!(
+            config.global.networks_options.tick_rate, DEFAULT_TICK_RATE,
+            "tick_rate should be set to default value"
+        );
+        assert_eq!(
+            config.database.keep_history, DEFAULT_DATABASE_KEEP_HISTORY,
+            "keep_history should be set to default value"
+        );
+        assert_eq!(
+            config.database.path,
+            PathBuf::from(DEFAULT_DATABASE_PATH),
+            "db_path should be set to default value"
+        );
+        // Endpoint and network values should be set and match with default values
+        let proto_providers = &config.proto_providers;
+        assert_eq!(
+            proto_providers.contains_key(&Protocol::Bitcoin),
+            true,
+            "Proto_provier should contain Bitcoin"
+        );
+        assert_eq!(
+            proto_providers.keys().len(),
+            1,
+            "Proto_provier should contain only Bitcoin"
+        );
+        let bitcoin_provider = proto_providers.get(&Protocol::Bitcoin).unwrap();
+        // should contain network mainnet
+        assert_eq!(
+            bitcoin_provider.contains_key(&Network::Mainnet),
+            true,
+            "bitcoin_provider should contain mainnet"
+        );
+        assert_eq!(
+            bitcoin_provider.keys().len(),
+            1,
+            "bitcoin_provider should contain only mainnet"
+        );
+        // sould contain 2 providers
+        assert_eq!(
+            bitcoin_provider.get(&Network::Mainnet).unwrap().len(),
+            2,
+            "bitcoin_provider mainnet should have 2 endpoints"
+        );
+        // Each provider should have default values
+        let mainnet_providers = bitcoin_provider.get(&Network::Mainnet).unwrap();
+        let expected_urls = vec![
+            "https://rpc-bitcoin-1.com".to_string(),
+            "https://rpc-bitcoin-2.com".to_string(),
+        ];
+        for provider in mainnet_providers.iter() {
+            match provider {
+                Provider::BitcoinNode(r) => {
+                    let r = r.clone();
+                    assert_eq!(
+                        expected_urls.contains(&r.endpoint.url),
+                        true,
+                        "Url should be one of the expected ones"
+                    );
+                    let client = r.endpoint.reqwest.unwrap();
+
+                    assert_eq!(
+                        client.config.retry, DEFAULT_ENDPOINT_RETRY,
+                        "Retry should be set to default"
+                    );
+                    assert_eq!(
+                        client.config.delay, DEFAULT_ENDPOINT_DELAY,
+                        "Delay should be set to default"
+                    );
+                    assert_eq!(
+                        client.config.rate, DEFAULT_ENDPOINT_REQUEST_RATE,
+                        "Rate should be set to default"
+                    );
+                }
+
+                _ => assert!(false, "Provider should be BitcoinNode"),
+            }
+        }
     }
 }
