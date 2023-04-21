@@ -11,6 +11,7 @@ pub trait ProviderActions: Send {
     async fn parse_top_blocks(
         &mut self,
         n_block: u32,
+        previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>>;
     //TODO: parse_top_blocks should fail if head not changed (avoid to parse all blocks)
 

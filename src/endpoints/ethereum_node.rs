@@ -16,12 +16,25 @@ impl ProviderActions for EthereumNode {
     async fn parse_top_blocks(
         &mut self,
         n_block: u32,
+        previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         if !self.endpoint.available() {
             return Err("Error: Endpoint not available".into());
         }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let head = self.get_block_by_number(None, false).await?.pop().unwrap();
+
+        if let Some(previous_head) = previous_head {
+            if previous_head == head.hash {
+                debug!(
+                    "No new block (head: {} block with hash {}), skip task",
+                    head.number, head.hash
+                );
+                self.endpoint.set_last_request();
+                return Err("No new block".into());
+            }
+        }
+
         let mut block_numbers = Vec::new();
         for i in 0..n_block {
             block_numbers.push(head.number - i as u64);
@@ -276,7 +289,7 @@ mod test {
             &env::var("ETHEREUM_NODE_URL").unwrap(),
             conf::Network::Mainnet,
         );
-        let res = ethereum_node.parse_top_blocks(5).await.unwrap();
+        let res = ethereum_node.parse_top_blocks(5, None).await.unwrap();
         assert_eq!(res.blocks.len(), 5);
     }
 }

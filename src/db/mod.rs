@@ -19,7 +19,6 @@ impl Redb {
     pub fn init(db_conf: &conf::Database) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb::new");
         let path = db_conf.path.clone();
-        println!("Redb::new() path {:?}", path);
         let db = Database::open(&path);
         match db {
             Ok(db) => {
@@ -113,7 +112,7 @@ impl Redb {
         let chain_db = match chain_db {
             Ok(data) => data,
             Err(e) => {
-                error!(
+                debug!(
                     "Redb get_blockchain return an error {:?} init empty blockchain",
                     e
                 );

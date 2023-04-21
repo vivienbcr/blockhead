@@ -43,6 +43,7 @@ impl ProviderActions for BitcoinNode {
     async fn parse_top_blocks(
         &mut self,
         n_block: u32,
+        previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         if !self.endpoint.available() {
             return Err("Error: Endpoint not available".into());
@@ -58,6 +59,19 @@ impl ProviderActions for BitcoinNode {
                 return Err(e);
             }
         };
+
+        /*
+         * If the previous head is the same as the best block hash, we don't need to do anything
+         */
+        if let Some(prev_head) = previous_head {
+            trace!("compare {} and {}", prev_head, best_block_hash);
+            if prev_head == best_block_hash {
+                debug!("No new block (head: {}), skip task", best_block_hash);
+                self.endpoint.set_last_request();
+                return Err("No new block".into());
+            }
+        }
+
         let mut prev_block_hash = best_block_hash;
         for _ in 0..n_block {
             let res = self.get_block(prev_block_hash.as_str()).await;

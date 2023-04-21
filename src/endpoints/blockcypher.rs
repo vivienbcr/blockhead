@@ -20,11 +20,23 @@ impl ProviderActions for Blockcypher {
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
+        previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         if !self.endpoint.available() {
             return Err("Error: Endpoint not available".into());
         }
-        let height = self.get_chain_height().await?;
+        let chain_state = self.get_chain_height().await?;
+        if let Some(previous_head) = previous_head {
+            if previous_head == chain_state.hash {
+                debug!(
+                    "No new block (head: {} block with hash {}), skip task",
+                    chain_state.height, chain_state.hash
+                );
+                self.endpoint.set_last_request();
+                return Err("No new block".into());
+            }
+        }
+        let height = chain_state.height;
         let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
@@ -50,14 +62,16 @@ impl Blockcypher {
             endpoint: conf::Endpoint::test_new(url, net),
         }
     }
-    async fn get_chain_height(&mut self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_chain_height(
+        &mut self,
+    ) -> Result<HeightResponse, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get head blockcypher");
         let url = format!("{}/v1/btc/main", self.endpoint.url);
         let res = self.run_request::<HeightResponse>(&url).await;
         match res {
-            Ok(res) => Ok(res.height),
+            Ok(res) => Ok(res),
             Err(e) => {
-                error!("Error while getting chain height: {}", e);
+                warn!("Error while getting chain height: {}", e);
                 Err(e)
             }
         }
@@ -109,7 +123,7 @@ impl Blockcypher {
         let res = match res {
             Ok(res) => res,
             Err(e) => {
-                error!("Blockcypher error: {}", e);
+                warn!("Blockcypher error: {}", e);
                 return Err(e);
             }
         };
@@ -176,8 +190,8 @@ mod tests {
         tests::setup();
         let mut blockcypher =
             Blockcypher::test_new("https://api.blockcypher.com", crate::conf::Network::Mainnet);
-        let res = blockcypher.get_chain_height().await.unwrap();
-        assert!(res > 0);
+        let chain_state = blockcypher.get_chain_height().await.unwrap();
+        assert!(chain_state.height > 0);
     }
 
     #[tokio::test]
