@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 pub struct BitcoinNode {
     pub endpoint: conf::Endpoint,
 }
+
 impl BitcoinNode {
     pub fn new(options: conf::EndpointOptions, network: conf::Network) -> BitcoinNode {
         let endpoint = Endpoint {
