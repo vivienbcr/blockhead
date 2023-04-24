@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
@@ -19,12 +19,26 @@ impl ProviderActions for Blockstream {
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
+        previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         if !self.endpoint.available() {
             return Err("Error: Endpoint not available".into());
         }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
-        let mut height = self.get_chain_height().await?;
+        let tip = self.get_chain_tip().await?;
+        if let Some(previous_head) = previous_head {
+            if previous_head == tip.id {
+                debug!(
+                    "No new block (head: {} block with hash {}), skip task",
+                    tip.height, tip.id
+                );
+                self.endpoint.set_last_request();
+                return Err("No new block".into());
+            }
+        }
+
+        let mut height = tip.height;
+
         let mut blocks = self.get_blocks_from_height(height).await?;
         while blocks.len() > 0 && blockchain.blocks.len() < nb_blocks as usize {
             for block in blocks {
@@ -60,45 +74,34 @@ impl Blockstream {
     }
     async fn get_blocks_from_height(
         &self,
-        height: u32,
+        height: u64,
     ) -> Result<Vec<Block>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/{}", self.endpoint.url, height);
-        self.run_request(&url).await
-    }
-
-    async fn get_chain_height(&self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
-        let url = format!("{}/blocks/tip/height", self.endpoint.url);
-        self.run_request(&url).await
-    }
-
-    async fn run_request<T: DeserializeOwned>(
-        &self,
-        url: &str,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        let reqwest = self.endpoint.reqwest.clone().unwrap();
-        let res = reqwest
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: Vec<Block> = client
             .get(
-                url,
+                &url,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
-            .await;
-        let res = match res {
-            Ok(res) => res,
-            Err(e) => {
-                debug!("Error Blockstream: {}", e);
-                return Err("Error: reqwest".into());
-            }
-        };
-        let res = serde_json::from_str::<T>(&res);
-        let res = match res {
-            Ok(res) => res,
-            Err(e) => {
-                debug!("Error Blockstream: deserialize json response {}", e);
-                return Err("Error: serde_json".into());
-            }
-        };
-        return Ok(res);
+            .await?;
+        Ok(res)
+    }
+
+    async fn get_chain_tip(&self) -> Result<Block, Box<dyn std::error::Error + Send + Sync>> {
+        let url = format!("{}/blocks/tip", self.endpoint.url);
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: Vec<Block> = client
+            .get(
+                &url,
+                &conf::Protocol::Bitcoin.to_string(),
+                &self.endpoint.network.to_string(),
+            )
+            .await?;
+        if res.len() == 0 {
+            return Err("Error: tip not found".into());
+        }
+        Ok(res[0].clone())
     }
 }
 

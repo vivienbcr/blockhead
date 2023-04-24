@@ -11,6 +11,7 @@ pub struct Block {
 pub struct Blockchain {
     pub blocks: Vec<Block>,
     pub height: u64,
+    pub last_scrapping_task: u64,
 }
 impl Blockchain {
     pub fn new(blocks: Option<Vec<Block>>) -> Blockchain {
@@ -21,6 +22,7 @@ impl Blockchain {
         Blockchain {
             blocks: b,
             height: 0,
+            last_scrapping_task: 0,
         }
     }
     pub fn add_block(&mut self, block: Block) {

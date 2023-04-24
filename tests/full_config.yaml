@@ -9,11 +9,11 @@ global:
   # Gobal configuration for all endpoints, if not defined in endpoint, global will be used
   options:
     # Retry define how many time worker will try to call instance if he fail
-    retry: 3
+    retry: 33
     # Delay between every retry
-    delay: 4
+    delay: 44
     # Rate between every scrapping task
-    rate: 5
+    rate: 55
   server:
     # On wich port json rpc will be served
     port: 6
@@ -22,15 +22,16 @@ global:
     port: 7
 database:
   # How many block will be kept in database
-  keep_history: 8
+  keep_history: 88
+  path: /some/path/file.db
 protocols:
   bitcoin:
     mainnet:
       network_options:
         head_length: 9
       rpc:
-      - url: https://rpc-bitcoin-1.com
-      - url: https://rpc-bitcoin-2.com
+      - url: https://rpc-bitcoin-mainnet-1.com
+      - url: https://rpc-bitcoin-mainnet-2.com
         options:
           retry: 13
           delay: 14
@@ -57,7 +58,7 @@ protocols:
           rate: 24
     sepolia:
       rpc:
-      - url: https://sample-url-7.com
+      - url: https://rpc-ethereum-6.com
         options:
           retry: 25
           delay: 26

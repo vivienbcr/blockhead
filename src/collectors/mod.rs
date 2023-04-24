@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use crate::{
     commons::blockchain,
@@ -18,12 +18,11 @@ pub async fn runner(
         "Spawning collector for protocol: {:?}, network: {:?}, with providers: {:?}",
         &protocol.to_string(),
         &network.to_string(),
-        providers.len()
+        &providers.len()
     );
     let mut providers = providers;
-
-    let mut interval =
-        tokio::time::interval(Duration::from_secs(net_opts.tick_rate.unwrap() as u64));
+    let mut head_hash: Option<String> = None;
+    let mut interval = tokio::time::interval(Duration::from_secs(net_opts.tick_rate as u64));
     loop {
         // get all providers that implement ProviderActions
         let mut providers_d: Vec<Box<&mut dyn ProviderActions>> = Vec::new();
@@ -36,19 +35,22 @@ pub async fn runner(
         // batch all tasks
         let tasks = providers_d
             .iter_mut()
-            .map(|p| p.parse_top_blocks(net_opts.head_length.unwrap()));
+            .map(|p| p.parse_top_blocks(net_opts.head_length, head_hash.clone()));
         let results = futures::future::join_all(tasks).await;
         // filter out errors
         let results = results
             .into_iter()
             .filter_map(|r| match r {
                 Ok(b) => Some(b),
-                Err(_) => None,
+                Err(e) => {
+                    trace!("Error : {:?}", e);
+                    None
+                }
             })
             .collect::<Vec<_>>();
         if results.len() == 0 {
             debug!(
-                "{:?} collector: results for network: {:?}",
+                "{:?} collector: no results for network: {:?}",
                 &protocol.to_string(),
                 &network.to_string()
             );
@@ -57,7 +59,7 @@ pub async fn runner(
         }
         let mut best_chain = blockchain::get_highest_blockchain(results).unwrap();
         best_chain.sort();
-        debug!("best_chain: {:?}", best_chain);
+        debug!("best_chain: {:?}", &best_chain);
         prom::registry::set_blockchain_metrics(
             protocol,
             network,
@@ -65,14 +67,19 @@ pub async fn runner(
             best_chain.blocks.last().unwrap().time as i64,
             best_chain.blocks.last().unwrap().txs as i64,
         );
+        best_chain.last_scrapping_task = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let db = DATABASE.get().unwrap();
         let r = db.set_blockchain(&best_chain, &protocol, &network);
         match r {
             Ok(_) => {
                 info!(
-                    "Blockchain {} {} saved successfully",
+                    "Blockchain {} {} saved successfully : last height {} ",
                     protocol.to_string(),
-                    &network.to_string()
+                    &network.to_string(),
+                    &best_chain.height
                 );
             }
             Err(e) => {
@@ -84,6 +91,8 @@ pub async fn runner(
                 );
             }
         }
+        let x = best_chain.clone().blocks.first().unwrap().hash.clone();
+        head_hash = Some(x);
         interval.tick().await;
     }
 }

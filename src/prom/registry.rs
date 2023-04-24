@@ -37,12 +37,20 @@ pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &s
         .inc();
 }
 
-pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &str, time: f64) {
+pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &str, time: u128) {
     // retain only https://domain.tld
     let base_domain = get_base_url(url);
+    trace!(
+        "track response time{} {} {} {} {}",
+        base_domain,
+        method,
+        protocol,
+        network,
+        time as f64
+    );
     metrics::ENDPOINT_RESPONSE_TIME
         .with_label_values(&[&base_domain, method, protocol, network])
-        .observe(time);
+        .observe(time as f64);
 }
 
 pub fn set_blockchain_metrics(

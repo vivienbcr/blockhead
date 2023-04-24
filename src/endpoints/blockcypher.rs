@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::DateTime;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::Deserialize;
 
 use crate::{
     commons::blockchain::{self, Block},
@@ -20,11 +20,23 @@ impl ProviderActions for Blockcypher {
     async fn parse_top_blocks(
         &mut self,
         nb_blocks: u32,
+        previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         if !self.endpoint.available() {
             return Err("Error: Endpoint not available".into());
         }
-        let height = self.get_chain_height().await?;
+        let chain_state = self.get_chain_height().await?;
+        if let Some(previous_head) = previous_head {
+            if previous_head == chain_state.hash {
+                debug!(
+                    "No new block (head: {} block with hash {}), skip task",
+                    chain_state.height, chain_state.hash
+                );
+                self.endpoint.set_last_request();
+                return Err("No new block".into());
+            }
+        }
+        let height = chain_state.height;
         let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
@@ -50,17 +62,20 @@ impl Blockcypher {
             endpoint: conf::Endpoint::test_new(url, net),
         }
     }
-    async fn get_chain_height(&mut self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_chain_height(
+        &mut self,
+    ) -> Result<HeightResponse, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get head blockcypher");
         let url = format!("{}/v1/btc/main", self.endpoint.url);
-        let res = self.run_request::<HeightResponse>(&url).await;
-        match res {
-            Ok(res) => Ok(res.height),
-            Err(e) => {
-                error!("Error while getting chain height: {}", e);
-                Err(e)
-            }
-        }
+        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let res: HeightResponse = client
+            .get(
+                &url,
+                &Protocol::Bitcoin.to_string(),
+                &self.endpoint.network.to_string(),
+            )
+            .await?;
+        Ok(res)
     }
     async fn get_blocks_from_height(
         &mut self,
@@ -72,55 +87,26 @@ impl Blockcypher {
         let mut blocks = Vec::new();
         for i in 0..n_block {
             let url = format!("{}/v1/btc/main/blocks/{}", self.endpoint.url, height - i);
-            let res = self.run_request::<BlockResponse>(&url).await;
-            match res {
-                Ok(res) => {
-                    let datetime = DateTime::parse_from_rfc3339(&res.time).unwrap();
-                    let timestamp = datetime.timestamp();
-                    blocks.push(Block {
-                        hash: res.hash,
-                        height: res.height as u64,
-                        time: timestamp as u64,
-                        txs: res.n_tx as u64,
-                    });
-                }
-                Err(e) => {
-                    error!("Error while getting blocks from height: {}", e);
-                    return Err(e);
-                }
-            }
+            let client = self.endpoint.reqwest.as_mut().unwrap();
+            let res: BlockResponse = client
+                .get(
+                    &url,
+                    &Protocol::Bitcoin.to_string(),
+                    &self.endpoint.network.to_string(),
+                )
+                .await?;
+
+            let datetime = DateTime::parse_from_rfc3339(&res.time).unwrap();
+            let timestamp = datetime.timestamp();
+            blocks.push(Block {
+                hash: res.hash,
+                height: res.height as u64,
+                time: timestamp as u64,
+                txs: res.n_tx as u64,
+            });
         }
+
         Ok(blocks)
-    }
-    async fn run_request<T: DeserializeOwned>(
-        &mut self,
-        url: &str,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Run blockcypher request: {}", url);
-        let client = self.endpoint.reqwest.clone().unwrap();
-        let res = client
-            .get(
-                &url,
-                &Protocol::Bitcoin.to_string(),
-                &self.endpoint.network.to_string(),
-            )
-            .await;
-        trace!("Blockcypher response: {:?}", res);
-        let res = match res {
-            Ok(res) => res,
-            Err(e) => {
-                error!("Blockcypher error: {}", e);
-                return Err(e);
-            }
-        };
-        let deserialize = serde_json::from_str::<T>(&res);
-        match deserialize {
-            Ok(deserialize) => Ok(deserialize),
-            Err(e) => {
-                error!("Blockcypher deserialize error: {}", e);
-                return Err(e.into());
-            }
-        }
     }
 }
 #[derive(Deserialize, Debug)]
@@ -176,8 +162,8 @@ mod tests {
         tests::setup();
         let mut blockcypher =
             Blockcypher::test_new("https://api.blockcypher.com", crate::conf::Network::Mainnet);
-        let res = blockcypher.get_chain_height().await.unwrap();
-        assert!(res > 0);
+        let chain_state = blockcypher.get_chain_height().await.unwrap();
+        assert!(chain_state.height > 0);
     }
 
     #[tokio::test]
