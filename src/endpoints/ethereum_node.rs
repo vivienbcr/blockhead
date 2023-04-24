@@ -1,5 +1,5 @@
 use super::ProviderActions;
-use crate::commons::blockchain;
+use crate::commons::blockchain::{self};
 use crate::conf::{self, Endpoint, EndpointActions};
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
@@ -76,7 +76,7 @@ impl EthereumNode {
         &mut self,
         block_numbers: Option<&Vec<u64>>,
         txs: bool,
-    ) -> Result<Vec<Block>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<Vec<EthBlock>, Box<dyn std::error::Error + Send + Sync>> {
         let req = match block_numbers {
             Some(block_numbers) => {
                 let mut batch = Vec::new();
@@ -108,56 +108,58 @@ impl EthereumNode {
             }
         };
         let reqwest = self.endpoint.reqwest.as_ref().unwrap();
-        let res = reqwest
-            .rpc(
-                &req,
-                &conf::Protocol::Ethereum.to_string(),
-                &self.endpoint.network.to_string(),
-            )
-            .await;
-        match res {
-            Ok(res) => match req {
-                JsonRpcReqBody::Single(_) => {
-                    let rpc_res: JsonRpcResponse<Block> = serde_json::from_str(&res)?;
-                    Ok(vec![rpc_res.result.unwrap()])
-                }
-                JsonRpcReqBody::Batch(_) => {
-                    let rpc_res: Vec<JsonRpcResponse<Block>> = serde_json::from_str(&res)?;
-                    let contain_err = rpc_res.iter().any(|r| {
-                        if r.error.is_some() || r.result.is_none() {
-                            return true;
-                        };
-                        false
-                    });
-                    if contain_err {
-                        error!(
-                            "Error in batch response: {:?}",
-                            rpc_res
-                                .iter()
-                                .filter(|r| r.error.is_some())
-                                .collect::<Vec<_>>()
-                        );
-                        return Err("Error in batch response".into());
-                    }
-                    let res = rpc_res
-                        .into_iter()
-                        .map(|r| {
-                            trace!("batch block: {:?}", r);
-                            r.result.unwrap()
-                        })
-                        .collect();
-                    Ok(res)
-                }
-            },
-            Err(err) => {
-                return Err(err);
+
+        let res = match req {
+            JsonRpcReqBody::Single(_) => {
+                let rpc_res: JsonRpcResponse<EthBlock> = reqwest
+                    .rpc(
+                        &req,
+                        &conf::Protocol::Ethereum.to_string(),
+                        &self.endpoint.network.to_string(),
+                    )
+                    .await?;
+                Ok(vec![rpc_res.result.unwrap()])
             }
-        }
+            JsonRpcReqBody::Batch(_) => {
+                let rpc_res: Vec<JsonRpcResponse<EthBlock>> = reqwest
+                    .rpc(
+                        &req,
+                        &conf::Protocol::Ethereum.to_string(),
+                        &self.endpoint.network.to_string(),
+                    )
+                    .await?;
+                let contain_err = rpc_res.iter().any(|r| {
+                    if r.error.is_some() || r.result.is_none() {
+                        return true;
+                    };
+                    false
+                });
+                if contain_err {
+                    error!(
+                        "Error in batch response: {:?}",
+                        rpc_res
+                            .iter()
+                            .filter(|r| r.error.is_some())
+                            .collect::<Vec<_>>()
+                    );
+                    return Err("Error in batch response".into());
+                }
+                let res = rpc_res
+                    .into_iter()
+                    .map(|r| {
+                        trace!("batch block: {:?}", r);
+                        r.result.unwrap()
+                    })
+                    .collect();
+                Ok(res)
+            }
+        };
+        res
     }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Block {
+pub struct EthBlock {
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     #[serde(rename = "baseFeePerGas")]
     pub base_fee_per_gas: u64,

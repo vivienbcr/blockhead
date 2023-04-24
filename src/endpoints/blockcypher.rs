@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::DateTime;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::Deserialize;
 
 use crate::{
     commons::blockchain::{self, Block},
@@ -67,14 +67,15 @@ impl Blockcypher {
     ) -> Result<HeightResponse, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get head blockcypher");
         let url = format!("{}/v1/btc/main", self.endpoint.url);
-        let res = self.run_request::<HeightResponse>(&url).await;
-        match res {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                warn!("Error while getting chain height: {}", e);
-                Err(e)
-            }
-        }
+        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let res: HeightResponse = client
+            .get(
+                &url,
+                &Protocol::Bitcoin.to_string(),
+                &self.endpoint.network.to_string(),
+            )
+            .await?;
+        Ok(res)
     }
     async fn get_blocks_from_height(
         &mut self,
@@ -86,55 +87,26 @@ impl Blockcypher {
         let mut blocks = Vec::new();
         for i in 0..n_block {
             let url = format!("{}/v1/btc/main/blocks/{}", self.endpoint.url, height - i);
-            let res = self.run_request::<BlockResponse>(&url).await;
-            match res {
-                Ok(res) => {
-                    let datetime = DateTime::parse_from_rfc3339(&res.time).unwrap();
-                    let timestamp = datetime.timestamp();
-                    blocks.push(Block {
-                        hash: res.hash,
-                        height: res.height as u64,
-                        time: timestamp as u64,
-                        txs: res.n_tx as u64,
-                    });
-                }
-                Err(e) => {
-                    error!("Error while getting blocks from height: {}", e);
-                    return Err(e);
-                }
-            }
+            let client = self.endpoint.reqwest.as_mut().unwrap();
+            let res: BlockResponse = client
+                .get(
+                    &url,
+                    &Protocol::Bitcoin.to_string(),
+                    &self.endpoint.network.to_string(),
+                )
+                .await?;
+
+            let datetime = DateTime::parse_from_rfc3339(&res.time).unwrap();
+            let timestamp = datetime.timestamp();
+            blocks.push(Block {
+                hash: res.hash,
+                height: res.height as u64,
+                time: timestamp as u64,
+                txs: res.n_tx as u64,
+            });
         }
+
         Ok(blocks)
-    }
-    async fn run_request<T: DeserializeOwned>(
-        &mut self,
-        url: &str,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Run blockcypher request: {}", url);
-        let client = self.endpoint.reqwest.clone().unwrap();
-        let res = client
-            .get(
-                &url,
-                &Protocol::Bitcoin.to_string(),
-                &self.endpoint.network.to_string(),
-            )
-            .await;
-        trace!("Blockcypher response: {:?}", res);
-        let res = match res {
-            Ok(res) => res,
-            Err(e) => {
-                warn!("Blockcypher error: {}", e);
-                return Err(e);
-            }
-        };
-        let deserialize = serde_json::from_str::<T>(&res);
-        match deserialize {
-            Ok(deserialize) => Ok(deserialize),
-            Err(e) => {
-                error!("Blockcypher deserialize error: {}", e);
-                return Err(e.into());
-            }
-        }
     }
 }
 #[derive(Deserialize, Debug)]

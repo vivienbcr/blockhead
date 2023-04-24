@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
@@ -77,43 +77,31 @@ impl Blockstream {
         height: u64,
     ) -> Result<Vec<Block>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/{}", self.endpoint.url, height);
-        self.run_request(&url).await
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: Vec<Block> = client
+            .get(
+                &url,
+                &conf::Protocol::Bitcoin.to_string(),
+                &self.endpoint.network.to_string(),
+            )
+            .await?;
+        Ok(res)
     }
 
     async fn get_chain_tip(&self) -> Result<Block, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/tip", self.endpoint.url);
-        let res: Vec<Block> = self.run_request(&url).await?;
-        Ok(res[0].clone())
-    }
-
-    async fn run_request<T: DeserializeOwned>(
-        &self,
-        url: &str,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        let reqwest = self.endpoint.reqwest.clone().unwrap();
-        let res = reqwest
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: Vec<Block> = client
             .get(
-                url,
+                &url,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
-            .await;
-        let res = match res {
-            Ok(res) => res,
-            Err(e) => {
-                debug!("Error Blockstream: {}", e);
-                return Err("Error: reqwest".into());
-            }
-        };
-        let res = serde_json::from_str::<T>(&res);
-        let res = match res {
-            Ok(res) => res,
-            Err(e) => {
-                debug!("Error Blockstream: deserialize json response {}", e);
-                return Err("Error: serde_json".into());
-            }
-        };
-        return Ok(res);
+            .await?;
+        if res.len() == 0 {
+            return Err("Error: tip not found".into());
+        }
+        Ok(res[0].clone())
     }
 }
 

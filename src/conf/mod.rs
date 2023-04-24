@@ -1,7 +1,8 @@
 use crate::{
     endpoints::{
         bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream,
-        ethereum_node::EthereumNode, ProviderActions,
+        ethereum_node::EthereumNode, tezos_node::TezosNode, tzkt::Tzkt, tzstats::TzStats,
+        ProviderActions,
     },
     requests::client::ReqwestClient,
 };
@@ -199,7 +200,7 @@ where
                         // Str is a provider declaration
                         str => {
                             debug!("Found provider {}", str);
-                            if Provider::is_available(provider) {
+                            if Provider::is_available(str) {
                                 let provider_config_f = ProviderConfigF::deserialize(opt).unwrap();
                                 let endpoint_opts = EndpointOptions::from_provider_config_f(
                                     provider_config_f,
@@ -277,6 +278,9 @@ pub enum Provider {
     Blockcypher(Blockcypher),
     BitcoinNode(BitcoinNode),
     EthereumNode(EthereumNode),
+    TezosNode(TezosNode),
+    Tzkt(Tzkt),
+    TzStats(TzStats),
     None,
 }
 #[cfg(test)]
@@ -332,6 +336,9 @@ impl Provider {
             "blockcypher" => Provider::Blockcypher(Blockcypher::new(endpoint_opt, n)),
             "bitcoin_node" => Provider::BitcoinNode(BitcoinNode::new(endpoint_opt, n)),
             "ethereum_node" => Provider::EthereumNode(EthereumNode::new(endpoint_opt, n)),
+            "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, n)),
+            "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, n)),
+            "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, n)),
             _ => Provider::None,
         }
     }
@@ -341,6 +348,9 @@ impl Provider {
             Provider::Blockcypher(provider) => Some(provider),
             Provider::BitcoinNode(provider) => Some(provider),
             Provider::EthereumNode(provider) => Some(provider),
+            Provider::TezosNode(provider) => Some(provider),
+            Provider::Tzkt(provider) => Some(provider),
+            Provider::TzStats(provider) => Some(provider),
             _ => None,
         }
     }
@@ -350,6 +360,9 @@ impl Provider {
             "blockcypher" => true,
             "bitcoin_node" => true,
             "ethereum_node" => true,
+            "tezos_node" => true,
+            "tzkt" => true,
+            "tzstats" => true,
             _ => false,
         }
     }

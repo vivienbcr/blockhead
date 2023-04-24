@@ -47,10 +47,22 @@ protocols:
         url: https://blockstream.info/api
       blockcypher:
         url: https://api.blockcypher.com
+    testnet: ...
   ethereum:
     mainnet:
       rpc:
         - url: https://sample.eth.mainnet.rpc
+    goerli: ...
+    sepolia: ...
+  tezos:
+    mainnet:
+      rpc:
+        - url: https://sample.tezos.mainnet.rpc
+      tzkt:
+        url: https://api.tzkt.io
+      tzstats:
+        url: https://api.tzstats.com
+    ghostnet: ...
 ```
 
 ## Run blockhead

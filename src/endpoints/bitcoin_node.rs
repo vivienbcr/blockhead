@@ -1,5 +1,5 @@
 use super::ProviderActions;
-use crate::commons::blockchain;
+use crate::commons::blockchain::{self};
 
 use crate::conf::{self, Endpoint, EndpointActions};
 
@@ -8,7 +8,7 @@ use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
+
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Debug, Clone)]
 pub struct BitcoinNode {
@@ -111,7 +111,15 @@ impl BitcoinNode {
             method: "getbestblockhash".to_string(),
             params: vec![],
         });
-        self.run_request(&body).await
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: JsonRpcResponse<String> = client
+            .rpc(
+                &body,
+                &conf::Protocol::Bitcoin.to_string(),
+                &self.endpoint.network.to_string(),
+            )
+            .await?;
+        Ok(res.result.unwrap())
     }
     pub async fn get_block(
         &self,
@@ -127,27 +135,15 @@ impl BitcoinNode {
                 JsonRpcParams::Number(1),
             ],
         });
-        self.run_request(&body).await
-    }
-
-    async fn run_request<T: DeserializeOwned>(
-        &self,
-        body: &JsonRpcReqBody,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Run for {}", self.endpoint.url);
-        let reqwest = self.endpoint.reqwest.as_ref().unwrap();
-        let res = reqwest
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: JsonRpcResponse<Getblock> = client
             .rpc(
                 &body,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
-            .await;
-        if res.is_err() {
-            return Err(res.err().unwrap());
-        }
-        let rpc_res: JsonRpcResponse<T> = serde_json::from_str(&res.unwrap())?;
-        return Ok(rpc_res.result.unwrap());
+            .await?;
+        Ok(res.result.unwrap())
     }
 }
 

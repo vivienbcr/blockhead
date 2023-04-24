@@ -19,7 +19,11 @@ pub static ENDPOINT_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "endpoint_response_time_seconds",
         "Time to get response from endpoint in second",
-        &["base_url", "method", "proto", "network"]
+        &["base_url", "method", "proto", "network"],
+        vec![
+            0.5, 1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 450.0,
+            500.0, 1000.0, 2500.0, 5000.0, 10000.0
+        ]
     )
     .expect("metric can be created")
 });

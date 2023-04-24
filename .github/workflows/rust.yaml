@@ -21,3 +21,4 @@ jobs:
         env:
           ETHEREUM_NODE_URL: ${{ secrets.ETHEREUM_NODE_URL }}
           BITCOIN_NODE_URL: ${{ secrets.BITCOIN_NODE_URL }}
+          TEZOS_NODE_URL: ${{ secrets.TEZOS_NODE_URL }}

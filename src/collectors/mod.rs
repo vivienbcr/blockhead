@@ -42,12 +42,15 @@ pub async fn runner(
             .into_iter()
             .filter_map(|r| match r {
                 Ok(b) => Some(b),
-                Err(_) => None,
+                Err(e) => {
+                    trace!("Error : {:?}", e);
+                    None
+                }
             })
             .collect::<Vec<_>>();
         if results.len() == 0 {
             debug!(
-                "{:?} collector: results for network: {:?}",
+                "{:?} collector: no results for network: {:?}",
                 &protocol.to_string(),
                 &network.to_string()
             );
