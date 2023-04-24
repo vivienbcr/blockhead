@@ -1,6 +1,6 @@
 use super::client::ReqwestClient;
 use crate::{prom::registry::track_response_time, prom::registry::track_status_code};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub const JSON_RPC_VER: &str = "2.0";
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonRpcResponse<T> {
@@ -53,12 +53,12 @@ impl Serialize for JsonRpcReqBody {
 }
 
 impl ReqwestClient {
-    pub async fn rpc(
+    pub async fn rpc<T: DeserializeOwned>(
         &self,
         body: &JsonRpcReqBody,
         protocol: &str,
         network: &str,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
         let b = serde_json::to_string(&body).unwrap();
         debug!("RPC request: {}", &b);
         let url = self.config.url.clone().unwrap().clone();
@@ -71,7 +71,7 @@ impl ReqwestClient {
                 .header("Content-Type", "application/json")
                 .send()
                 .await;
-            let time_duration = time_start.elapsed().as_secs_f64();
+            let time_duration = time_start.elapsed().as_millis();
             if response.is_err() {
                 debug!(
                     "Error: rpc request {} error, retrying in {} seconds, tries {} on {} ",
@@ -105,22 +105,24 @@ impl ReqwestClient {
             trace!("RPC {} response text: {:?}", url, txt);
             track_response_time(&url, "POST", protocol, network, time_duration);
             debug!("RPC {} OK", url);
-            return Ok(txt?);
+            let r: T = serde_json::from_str(&txt?)?;
+            return Ok(r);
         }
         return Err(format!("Error: RPC {} fail after {} retry", url, self.config.rate).into());
     }
 
-    pub async fn get(
+    pub async fn get<T: DeserializeOwned>(
         &self,
         url: &str,
         protocol: &str,
         network: &str,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
         let url = url.to_string();
+        trace!("GET {} request", url);
         for i in 0..self.config.retry {
             let time_start = std::time::Instant::now();
             let response = self.client.get(&url).send().await;
-            let time_duration = time_start.elapsed().as_secs_f64();
+            let time_duration = time_start.elapsed().as_millis();
             if response.is_err() {
                 debug!(
                     "Error: GET {} request error, retrying in {} seconds, tries {} on {} ",
@@ -141,7 +143,8 @@ impl ReqwestClient {
                 continue;
             }
             track_response_time(&url, "GET", protocol, network, time_duration);
-            return Ok(response.text().await?);
+            let r: T = serde_json::from_str(&response.text().await?)?;
+            return Ok(r);
         }
         return Err(format!("Error: GET {} fail after {} retry", url, self.config.rate).into());
     }

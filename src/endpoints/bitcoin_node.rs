@@ -1,5 +1,5 @@
 use super::ProviderActions;
-use crate::commons::blockchain;
+use crate::commons::blockchain::{self};
 
 use crate::conf::{self, Endpoint, EndpointActions};
 
@@ -8,7 +8,7 @@ use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
 use async_trait::async_trait;
-use serde::de::DeserializeOwned;
+
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Debug, Clone)]
 pub struct BitcoinNode {
@@ -43,6 +43,7 @@ impl ProviderActions for BitcoinNode {
     async fn parse_top_blocks(
         &mut self,
         n_block: u32,
+        previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
         if !self.endpoint.available() {
             return Err("Error: Endpoint not available".into());
@@ -58,6 +59,19 @@ impl ProviderActions for BitcoinNode {
                 return Err(e);
             }
         };
+
+        /*
+         * If the previous head is the same as the best block hash, we don't need to do anything
+         */
+        if let Some(prev_head) = previous_head {
+            trace!("compare {} and {}", prev_head, best_block_hash);
+            if prev_head == best_block_hash {
+                debug!("No new block (head: {}), skip task", best_block_hash);
+                self.endpoint.set_last_request();
+                return Err("No new block".into());
+            }
+        }
+
         let mut prev_block_hash = best_block_hash;
         for _ in 0..n_block {
             let res = self.get_block(prev_block_hash.as_str()).await;
@@ -97,7 +111,15 @@ impl BitcoinNode {
             method: "getbestblockhash".to_string(),
             params: vec![],
         });
-        self.run_request(&body).await
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: JsonRpcResponse<String> = client
+            .rpc(
+                &body,
+                &conf::Protocol::Bitcoin.to_string(),
+                &self.endpoint.network.to_string(),
+            )
+            .await?;
+        Ok(res.result.unwrap())
     }
     pub async fn get_block(
         &self,
@@ -113,27 +135,15 @@ impl BitcoinNode {
                 JsonRpcParams::Number(1),
             ],
         });
-        self.run_request(&body).await
-    }
-
-    async fn run_request<T: DeserializeOwned>(
-        &self,
-        body: &JsonRpcReqBody,
-    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        trace!("Run for {}", self.endpoint.url);
-        let reqwest = self.endpoint.reqwest.as_ref().unwrap();
-        let res = reqwest
+        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let res: JsonRpcResponse<Getblock> = client
             .rpc(
                 &body,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
             )
-            .await;
-        if res.is_err() {
-            return Err(res.err().unwrap());
-        }
-        let rpc_res: JsonRpcResponse<T> = serde_json::from_str(&res.unwrap())?;
-        return Ok(rpc_res.result.unwrap());
+            .await?;
+        Ok(res.result.unwrap())
     }
 }
 
