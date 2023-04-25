@@ -278,6 +278,7 @@ pub enum Provider {
     Blockcypher(Blockcypher),
     BitcoinNode(BitcoinNode),
     EthereumNode(EthereumNode),
+    EwfNode(EthereumNode),
     TezosNode(TezosNode),
     Tzkt(Tzkt),
     TzStats(TzStats),
@@ -332,13 +333,22 @@ impl Provider {
     pub fn from_str(provider: &str, endpoint_opt: EndpointOptions, network: &Network) -> Provider {
         let n = network.to_owned();
         match provider {
-            "blockstream" => Provider::Blockstream(Blockstream::new(endpoint_opt, n)),
-            "blockcypher" => Provider::Blockcypher(Blockcypher::new(endpoint_opt, n)),
-            "bitcoin_node" => Provider::BitcoinNode(BitcoinNode::new(endpoint_opt, n)),
-            "ethereum_node" => Provider::EthereumNode(EthereumNode::new(endpoint_opt, n)),
-            "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, n)),
-            "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, n)),
-            "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, n)),
+            "blockstream" => {
+                Provider::Blockstream(Blockstream::new(endpoint_opt, Protocol::Bitcoin, n))
+            }
+            "blockcypher" => {
+                Provider::Blockcypher(Blockcypher::new(endpoint_opt, Protocol::Bitcoin, n))
+            }
+            "bitcoin_node" => {
+                Provider::BitcoinNode(BitcoinNode::new(endpoint_opt, Protocol::Bitcoin, n))
+            }
+            "ethereum_node" => {
+                Provider::EthereumNode(EthereumNode::new(endpoint_opt, Protocol::Ethereum, n))
+            }
+            "ewf_node" => Provider::EwfNode(EthereumNode::new(endpoint_opt, Protocol::Ewf, n)),
+            "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, Protocol::Tezos, n)),
+            "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, Protocol::Tezos, n)),
+            "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, Protocol::Tezos, n)),
             _ => Provider::None,
         }
     }
@@ -348,6 +358,7 @@ impl Provider {
             Provider::Blockcypher(provider) => Some(provider),
             Provider::BitcoinNode(provider) => Some(provider),
             Provider::EthereumNode(provider) => Some(provider),
+            Provider::EwfNode(provider) => Some(provider),
             Provider::TezosNode(provider) => Some(provider),
             Provider::Tzkt(provider) => Some(provider),
             Provider::TzStats(provider) => Some(provider),
@@ -360,6 +371,7 @@ impl Provider {
             "blockcypher" => true,
             "bitcoin_node" => true,
             "ethereum_node" => true,
+            "ewf_node" => true,
             "tezos_node" => true,
             "tzkt" => true,
             "tzstats" => true,
@@ -490,6 +502,8 @@ pub enum Protocol {
     Bitcoin,
     #[serde(rename = "ethereum")]
     Ethereum,
+    #[serde(rename = "ewf")]
+    Ewf,
     #[serde(rename = "tezos")]
     Tezos,
     #[serde(rename = "None")]
@@ -501,6 +515,7 @@ impl Protocol {
         match s.as_str() {
             "bitcoin" => Some(Protocol::Bitcoin),
             "ethereum" => Some(Protocol::Ethereum),
+            "ewf" => Some(Protocol::Ewf),
             "tezos" => Some(Protocol::Tezos),
             _ => None,
         }
@@ -509,6 +524,7 @@ impl Protocol {
         match self {
             Protocol::Bitcoin => "bitcoin".to_string(),
             Protocol::Ethereum => "ethereum".to_string(),
+            Protocol::Ewf => "ewf".to_string(),
             Protocol::Tezos => "tezos".to_string(),
             Protocol::None => "None".to_string(),
         }
@@ -524,6 +540,8 @@ pub enum Network {
     Goerli,
     #[serde(rename = "sepolia")]
     Sepolia,
+    #[serde(rename = "volta")]
+    Volta,
     #[serde(rename = "ghostnet")]
     Ghostnet,
 }
@@ -534,6 +552,7 @@ impl Network {
             "testnet" => Some(Network::Testnet),
             "goerli" => Some(Network::Goerli),
             "sepolia" => Some(Network::Sepolia),
+            "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
             _ => None,
         }
@@ -544,6 +563,7 @@ impl Network {
             Network::Testnet => "testnet".to_string(),
             Network::Goerli => "goerli".to_string(),
             Network::Sepolia => "sepolia".to_string(),
+            Network::Volta => "volta".to_string(),
             Network::Ghostnet => "ghostnet".to_string(),
         }
     }
@@ -556,15 +576,18 @@ pub struct Endpoint {
     #[serde(skip)]
     pub network: Network,
     #[serde(skip)]
+    pub protocol: Protocol,
+    #[serde(skip)]
     pub last_request: u64,
 }
 impl Endpoint {
     #[cfg(test)]
-    pub fn test_new(url: &str, net: Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         let opt = EndpointOptions::test_new(url);
         Endpoint {
             last_request: 0,
             url: url.to_string(),
+            protocol: proto,
             network: net,
             reqwest: Some(ReqwestClient::new(opt)),
         }

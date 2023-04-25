@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain;
 
-use crate::conf::{self, Endpoint, EndpointActions, Protocol};
+use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -15,19 +15,20 @@ pub struct TezosNode {
     pub endpoint: conf::Endpoint,
 }
 impl TezosNode {
-    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> TezosNode {
+    pub fn new(options: conf::EndpointOptions, protocol: Protocol, network: Network) -> TezosNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network,
+            protocol,
+            network,
             last_request: 0,
         };
         TezosNode { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: crate::conf::Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         TezosNode {
-            endpoint: conf::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net),
         }
     }
 }
@@ -246,7 +247,7 @@ mod tests {
     async fn tezos_get_block() {
         tests::setup();
         let url = env::var("TEZOS_NODE_URL").unwrap();
-        let tezos_node = TezosNode::test_new(&url, conf::Network::Mainnet);
+        let tezos_node = TezosNode::test_new(&url, Protocol::Tezos, Network::Mainnet);
         let r = tezos_node.get_block(None).await;
         assert!(r.is_ok());
         let block_head = r.unwrap();
@@ -259,19 +260,16 @@ mod tests {
     async fn tezos_count_tx() {
         tests::setup();
         let url = env::var("TEZOS_NODE_URL").unwrap();
-        let tezos_node = TezosNode::test_new(&url, conf::Network::Mainnet);
+        let tezos_node = TezosNode::test_new(&url, Protocol::Tezos, Network::Mainnet);
         let r = tezos_node.get_block(None).await;
 
         assert!(r.is_ok());
-        let r = r.unwrap();
-        let op_count = r.count_tx();
-        println!("op_count {:?}", op_count);
     }
     #[tokio::test]
     async fn tezos_parse_top_blocks() {
         tests::setup();
         let url = env::var("TEZOS_NODE_URL").unwrap();
-        let mut tezos_node = TezosNode::test_new(&url, conf::Network::Mainnet);
+        let mut tezos_node = TezosNode::test_new(&url, Protocol::Tezos, Network::Mainnet);
         let r = tezos_node.parse_top_blocks(10, None).await;
         assert!(r.is_ok());
         let blockchain = r.unwrap();

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
-    conf::{self, Endpoint, EndpointActions},
+    conf::{self, Endpoint, EndpointActions, Protocol},
     requests::client::ReqwestClient,
 };
 
@@ -63,11 +63,16 @@ impl ProviderActions for Blockstream {
 }
 
 impl Blockstream {
-    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> Blockstream {
+    pub fn new(
+        options: conf::EndpointOptions,
+        protocol: Protocol,
+        network: conf::Network,
+    ) -> Blockstream {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network,
+            protocol,
+            network,
             last_request: 0,
         };
         Blockstream { endpoint }

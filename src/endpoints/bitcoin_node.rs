@@ -1,7 +1,7 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
 
-use crate::conf::{self, Endpoint, EndpointActions};
+use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
 
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
@@ -16,19 +16,24 @@ pub struct BitcoinNode {
 }
 
 impl BitcoinNode {
-    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> BitcoinNode {
+    pub fn new(
+        options: conf::EndpointOptions,
+        protocol: Protocol,
+        network: Network,
+    ) -> BitcoinNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network,
+            protocol,
+            network,
             last_request: 0,
         };
         BitcoinNode { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: crate::conf::Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         BitcoinNode {
-            endpoint: conf::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net),
         }
     }
 }
@@ -209,7 +214,7 @@ mod test {
     async fn test_get_best_block_hash() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
-        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network::Mainnet);
+        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
         let res = bitcoin_node.get_best_block_hash().await;
         assert!(
             res.is_ok(),
@@ -222,7 +227,7 @@ mod test {
     async fn test_get_block() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
-        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Network::Mainnet);
+        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
         let res = bitcoin_node
             .get_block(&"00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce")
             .await;

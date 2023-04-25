@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     commons::blockchain::{self, Block},
-    conf::{self, Endpoint, EndpointActions, Protocol},
+    conf::{Endpoint, EndpointActions, EndpointOptions, Network, Protocol},
     requests::client::ReqwestClient,
 };
 
@@ -47,19 +47,20 @@ impl ProviderActions for Blockcypher {
 }
 
 impl Blockcypher {
-    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> Blockcypher {
+    pub fn new(options: EndpointOptions, protocol: Protocol, network: Network) -> Blockcypher {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network,
+            protocol,
+            network,
             last_request: 0,
         };
         Blockcypher { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: crate::conf::Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         Blockcypher {
-            endpoint: conf::Endpoint::test_new(url, net),
+            endpoint: Endpoint::test_new(url, proto, net),
         }
     }
     async fn get_chain_height(
@@ -160,8 +161,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_chain_height() {
         tests::setup();
-        let mut blockcypher =
-            Blockcypher::test_new("https://api.blockcypher.com", crate::conf::Network::Mainnet);
+        let mut blockcypher = Blockcypher::test_new(
+            "https://api.blockcypher.com",
+            Protocol::Bitcoin,
+            Network::Mainnet,
+        );
         let chain_state = blockcypher.get_chain_height().await.unwrap();
         assert!(chain_state.height > 0);
     }
@@ -171,8 +175,11 @@ mod tests {
         tests::setup();
         let n_block = 10;
         let height = 100;
-        let mut blockcypher =
-            Blockcypher::test_new("https://api.blockcypher.com", crate::conf::Network::Mainnet);
+        let mut blockcypher = Blockcypher::test_new(
+            "https://api.blockcypher.com",
+            Protocol::Bitcoin,
+            Network::Mainnet,
+        );
         let res = blockcypher
             .get_blocks_from_height(height, n_block)
             .await
