@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain;
 
-use crate::conf::{self, Endpoint, EndpointActions, Protocol};
+use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -14,19 +14,20 @@ pub struct Tzkt {
 }
 
 impl Tzkt {
-    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> Tzkt {
+    pub fn new(options: conf::EndpointOptions, protocol: Protocol, network: Network) -> Tzkt {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network,
+            protocol,
+            network,
             last_request: 0,
         };
         Tzkt { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: crate::conf::Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: crate::conf::Network) -> Self {
         Tzkt {
-            endpoint: conf::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net),
         }
     }
 }
@@ -238,7 +239,7 @@ mod tests {
     async fn tzkt_get_block_full() {
         tests::setup();
         let url = "https://api.ghostnet.tzkt.io";
-        let mut tzkt = Tzkt::test_new(url, conf::Network::Ghostnet);
+        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, Network::Ghostnet);
         let r = tzkt.get_block_full(123456).await.unwrap();
         assert_eq!(r.level, 123456);
     }
@@ -246,7 +247,7 @@ mod tests {
     async fn tzkt_get_head() {
         tests::setup();
         let url = "https://api.ghostnet.tzkt.io";
-        let mut tzkt = Tzkt::test_new(url, conf::Network::Ghostnet);
+        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, Network::Ghostnet);
         let r = tzkt.get_head().await.unwrap();
         assert!(r.level > 123456);
     }
@@ -254,7 +255,7 @@ mod tests {
     async fn tzkt_parse_top() {
         tests::setup();
         let url = "https://api.ghostnet.tzkt.io";
-        let mut tzkt = Tzkt::test_new(url, conf::Network::Ghostnet);
+        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, Network::Ghostnet);
         let r = tzkt.parse_top_blocks(5, None).await.unwrap();
         assert_eq!(r.blocks.len(), 5);
         let head = r.blocks[0].clone();

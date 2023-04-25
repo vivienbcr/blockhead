@@ -1,6 +1,6 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
-use crate::conf::{self, Endpoint, EndpointActions};
+use crate::conf::{self, Endpoint, EndpointActions, EndpointOptions, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -57,19 +57,20 @@ impl ProviderActions for EthereumNode {
 }
 
 impl EthereumNode {
-    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> EthereumNode {
+    pub fn new(options: EndpointOptions, protocol: Protocol, network: Network) -> EthereumNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network,
+            protocol,
+            network,
             last_request: 0,
         };
         EthereumNode { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: conf::Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         EthereumNode {
-            endpoint: conf::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net),
         }
     }
     pub async fn get_block_by_number(
@@ -163,8 +164,8 @@ pub struct EthBlock {
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     #[serde(rename = "baseFeePerGas")]
     pub base_fee_per_gas: u64,
-    #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
-    pub difficulty: u64,
+    #[serde(deserialize_with = "deserialize_from_hex_to_u128")]
+    pub difficulty: u128,
     #[serde(rename = "extraData")]
     pub extra_data: String,
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
@@ -178,8 +179,8 @@ pub struct EthBlock {
     pub logs_bloom: String,
     pub miner: String,
     #[serde(rename = "mixHash")]
-    pub mix_hash: String,
-    pub nonce: String,
+    pub mix_hash: Option<String>, // Options to deal with Forks
+    pub nonce: Option<String>, // Options to deal with Forks
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     pub number: u64,
     #[serde(rename = "parentHash")]
@@ -194,9 +195,10 @@ pub struct EthBlock {
     pub state_root: String,
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     pub timestamp: u64,
-    #[serde(deserialize_with = "deserialize_from_hex_to_u128")]
+    //TODO: Some Eth forks use totalDifficulty > u128, we need use big number crate to support it
+    // while we don't need to use it now, so just use String
     #[serde(rename = "totalDifficulty")]
-    pub total_difficulty: u128,
+    pub total_difficulty: String,
     #[serde(rename = "transactionsRoot")]
     pub transactions_root: String,
     pub uncles: Vec<String>,
@@ -211,7 +213,16 @@ where
     let s = String::deserialize(deserializer)?;
     let hex_str = s.trim_start_matches("0x");
     let z = u64::from_str_radix(hex_str, 16);
-    Ok(z.unwrap())
+    match z {
+        Ok(z) => Ok(z),
+        Err(e) => {
+            error!("deserialize_from_hex_to_u64 error: {} {}", e, s);
+            Err(serde::de::Error::custom(format!(
+                "deserialize_from_hex_to_u64 error: {} {}",
+                e, s,
+            )))
+        }
+    }
 }
 // FIXME: Should be merge in same function with deserialize_from_hex_to_u64
 pub fn deserialize_from_hex_to_u128<'de, D>(deserializer: D) -> Result<u128, D::Error>
@@ -221,7 +232,16 @@ where
     let s = String::deserialize(deserializer)?;
     let hex_str = s.trim_start_matches("0x");
     let z = u128::from_str_radix(hex_str, 16);
-    Ok(z.unwrap())
+    match z {
+        Ok(z) => Ok(z),
+        Err(e) => {
+            error!("deserialize_from_hex_to_u128 error: {} {}", e, s);
+            Err(serde::de::Error::custom(format!(
+                "deserialize_from_hex_to_u128 error:{} {}",
+                e, s,
+            )))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -232,11 +252,12 @@ mod test {
     use crate::tests;
     use std::env;
     #[tokio::test]
-    async fn test_get_latest_block_by_number() {
+    async fn eth_node_get_latest_block_by_number() {
         tests::setup();
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
-            conf::Network::Mainnet,
+            Protocol::Ethereum,
+            Network::Mainnet,
         );
         let block = ethereum_node
             .get_block_by_number(None, false)
@@ -246,12 +267,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_get_multiple_block_by_number() {
+    async fn eth_node_get_multiple_block_by_number() {
         tests::setup();
         let block_len = 5;
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
-            conf::Network::Mainnet,
+            Protocol::Ethereum,
+            Network::Mainnet,
         );
         let block = ethereum_node
             .get_block_by_number(None, false)
@@ -285,11 +307,23 @@ mod test {
         );
     }
     #[tokio::test]
-    async fn test_parse_top_blocks() {
+    async fn eth_node_parse_top_blocks() {
         tests::setup();
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
-            conf::Network::Mainnet,
+            Protocol::Ethereum,
+            Network::Mainnet,
+        );
+        let res = ethereum_node.parse_top_blocks(5, None).await.unwrap();
+        assert_eq!(res.blocks.len(), 5);
+    }
+    #[tokio::test]
+    async fn eth_node_fork_parse_top_blocks() {
+        tests::setup();
+        let mut ethereum_node = EthereumNode::test_new(
+            &env::var("EWF_NODE_URL").unwrap(),
+            Protocol::Ethereum,
+            Network::Mainnet,
         );
         let res = ethereum_node.parse_top_blocks(5, None).await.unwrap();
         assert_eq!(res.blocks.len(), 5);

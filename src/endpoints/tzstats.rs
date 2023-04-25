@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain::{self, Block};
 
-use crate::conf::{self, Endpoint, EndpointActions, Protocol};
+use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -14,19 +14,20 @@ pub struct TzStats {
 }
 
 impl TzStats {
-    pub fn new(options: conf::EndpointOptions, network: conf::Network) -> TzStats {
+    pub fn new(options: conf::EndpointOptions, protocol: Protocol, network: Network) -> TzStats {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
             reqwest: Some(ReqwestClient::new(options)),
-            network: network,
+            protocol,
+            network,
             last_request: 0,
         };
         TzStats { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, net: crate::conf::Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         TzStats {
-            endpoint: conf::Endpoint::test_new(url, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net),
         }
     }
     async fn get_block(
@@ -160,7 +161,7 @@ mod tests {
     async fn tzstats_parse_top_blocks() {
         tests::setup();
         let url = "https://api.ghost.tzstats.com";
-        let mut tzstats = TzStats::test_new(url, conf::Network::Ghostnet);
+        let mut tzstats = TzStats::test_new(url, Protocol::Tezos, Network::Ghostnet);
         let blockchain = tzstats
             .parse_top_blocks(5, None)
             .await
