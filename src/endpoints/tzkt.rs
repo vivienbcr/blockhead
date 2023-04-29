@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain;
 
-use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
+use crate::conf::{self, Endpoint, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -44,9 +44,6 @@ impl ProviderActions for Tzkt {
             previous_head
         );
 
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let previous_head: String = previous_head.unwrap_or("".to_string());
 
         let head = self.get_head().await?;
@@ -55,7 +52,6 @@ impl ProviderActions for Tzkt {
                 "No new block (head: {} block with hash {}), skip task",
                 head.level, head.hash
             );
-            self.endpoint.set_last_request();
             return Err("No new block".into());
         }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
@@ -80,7 +76,6 @@ impl ProviderActions for Tzkt {
             i += 1;
         }
         blockchain.sort();
-        self.endpoint.set_last_request();
         Ok(blockchain)
     }
 }
@@ -91,7 +86,7 @@ impl Tzkt {
             "{}/v1/blocks?sort.desc=level&select=level,hash&limit=1",
             self.endpoint.url,
         );
-        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: Vec<TzktHead> = client
             .get(
                 &url,
@@ -113,7 +108,7 @@ impl Tzkt {
             "{}/v1/blocks/{}?operations=true",
             self.endpoint.url, block_level
         );
-        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: TzktBlockFull = client
             .get(
                 &url,

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain;
 
-use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
+use crate::conf::{self, Endpoint, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -51,9 +51,6 @@ impl ProviderActions for PolkadotNode {
             n_block,
             previous_head
         );
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let previous_head = previous_head.unwrap_or("".to_string());
         let head_hash = self.get_finalized_head().await?;
 
@@ -90,7 +87,6 @@ impl ProviderActions for PolkadotNode {
             blockchain.add_block(b);
         }
         blockchain.sort();
-        self.endpoint.set_last_request();
         Ok(blockchain)
     }
 }
@@ -106,7 +102,7 @@ impl PolkadotNode {
             id: 1,
         };
         let req = JsonRpcReqBody::Single(req);
-        let reqwest = self.endpoint.reqwest.as_ref().unwrap();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
         let res: JsonRpcResponse<String> = reqwest
             .rpc(
                 &req,
@@ -138,7 +134,7 @@ impl PolkadotNode {
             batch.push(req);
         });
         let req = JsonRpcReqBody::Batch(batch);
-        let reqwest = self.endpoint.reqwest.as_ref().unwrap();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
         let res: Vec<JsonRpcResponse<PolkadotBlockResponse>> = reqwest
             .rpc(
                 &req,

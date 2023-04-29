@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     commons::blockchain::{self, Block},
-    conf::{Endpoint, EndpointActions, EndpointOptions, Network, Protocol},
+    conf::{Endpoint, EndpointOptions, Network, Protocol},
     requests::client::ReqwestClient,
 };
 
@@ -22,9 +22,6 @@ impl ProviderActions for Blockcypher {
         nb_blocks: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let chain_state = self.get_chain_height().await?;
         if let Some(previous_head) = previous_head {
             if previous_head == chain_state.hash {
@@ -32,7 +29,6 @@ impl ProviderActions for Blockcypher {
                     "No new block (head: {} block with hash {}), skip task",
                     chain_state.height, chain_state.hash
                 );
-                self.endpoint.set_last_request();
                 return Err("No new block".into());
             }
         }
@@ -40,8 +36,6 @@ impl ProviderActions for Blockcypher {
         let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
-        self.endpoint.set_last_request();
-
         Ok(blockchain)
     }
 }

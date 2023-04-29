@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain::{self, Block};
 
-use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
+use crate::conf::{self, Endpoint, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -59,9 +59,6 @@ impl ProviderActions for TzStats {
             n_block,
             previous_head
         );
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let head = self.get_block(None).await?;
         let previous_head: String = previous_head.unwrap_or("".to_string());
         if previous_head == head.hash {
@@ -69,7 +66,6 @@ impl ProviderActions for TzStats {
                 "No new block (head: {} block with hash {}), skip task",
                 head.height, head.hash
             );
-            self.endpoint.set_last_request();
             return Err("No new block".into());
         }
         let head_block = Block {

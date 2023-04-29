@@ -14,12 +14,7 @@ use env_logger::Env;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::{
-    collections::HashMap,
-    ffi::OsString,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, ffi::OsString, path::PathBuf};
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 
@@ -608,30 +603,30 @@ impl Endpoint {
         }
     }
 }
-impl EndpointActions for Endpoint {
-    fn set_last_request(&mut self) {
-        self.last_request = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-    }
-    fn available(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        let diff = now - self.last_request;
-        if diff < self.reqwest.clone().unwrap().config.rate as u64 {
-            debug!("Rate limit reached for {} ({}s)", self.url, diff);
-            return false;
-        }
-        true
-    }
-}
-pub trait EndpointActions {
-    fn set_last_request(&mut self);
-    fn available(&self) -> bool;
-}
+// impl EndpointActions for Endpoint {
+//     // fn set_last_request(&mut self) {
+//     //     self.last_request = SystemTime::now()
+//     //         .duration_since(UNIX_EPOCH)
+//     //         .expect("Time went backwards")
+//     //         .as_secs();
+//     // }
+//     fn available(&self) -> bool {
+//         let now = SystemTime::now()
+//             .duration_since(UNIX_EPOCH)
+//             .expect("Time went backwards")
+//             .as_secs();
+//         let diff = now - self.last_request;
+//         if diff < self.reqwest.clone().unwrap().config.rate as u64 {
+//             debug!("Rate limit reached for {} ({}s)", self.url, diff);
+//             return false;
+//         }
+//         true
+//     }
+// }
+// pub trait EndpointActions {
+//     // fn set_last_request(&mut self);
+//     fn available(&self) -> bool;
+// }
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum LogLevel {
     Info,

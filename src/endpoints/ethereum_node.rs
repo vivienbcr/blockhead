@@ -1,6 +1,6 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
-use crate::conf::{self, Endpoint, EndpointActions, EndpointOptions, Network, Protocol};
+use crate::conf::{self, Endpoint, EndpointOptions, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -19,9 +19,6 @@ impl ProviderActions for EthereumNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let head = self.get_block_by_number(None, false).await?.pop().unwrap();
 
@@ -31,7 +28,6 @@ impl ProviderActions for EthereumNode {
                     "No new block (head: {} block with hash {}), skip task",
                     head.number, head.hash
                 );
-                self.endpoint.set_last_request();
                 return Err("No new block".into());
             }
         }
@@ -52,7 +48,6 @@ impl ProviderActions for EthereumNode {
             });
         }
         blockchain.sort();
-        self.endpoint.set_last_request();
         Ok(blockchain)
     }
 }
@@ -109,7 +104,7 @@ impl EthereumNode {
                 JsonRpcReqBody::Single(body)
             }
         };
-        let reqwest = self.endpoint.reqwest.as_ref().unwrap();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
 
         let res = match req {
             JsonRpcReqBody::Single(_) => {

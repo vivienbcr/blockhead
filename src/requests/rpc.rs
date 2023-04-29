@@ -40,6 +40,7 @@ pub enum JsonRpcReqBody {
     Single(JsonRpcReq),
     Batch(Vec<JsonRpcReq>),
 }
+
 // implement custom serialization for JsonRpcReqBody
 impl Serialize for JsonRpcReqBody {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -52,17 +53,55 @@ impl Serialize for JsonRpcReqBody {
         }
     }
 }
+#[derive(Debug)]
+pub enum RequestError {
+    UndefinedUrl,
+    EndpointReachRateLimit(String),
+    DeserializeRequestError(Error),
+}
+impl std::fmt::Display for RequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RequestError::UndefinedUrl => write!(f, "Undefined url"),
+            RequestError::EndpointReachRateLimit(url) => {
+                write!(f, "Endpoint reach rate limit: {}", url)
+            }
+            RequestError::DeserializeRequestError(e) => {
+                write!(f, "Deserialize request error: {}", e)
+            }
+        }
+    }
+}
+impl std::error::Error for RequestError {}
 
 impl ReqwestClient {
     pub async fn rpc<T: DeserializeOwned>(
-        &self,
+        &mut self,
         body: &JsonRpcReqBody,
         protocol: &str,
         network: &str,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        let b = serde_json::to_string(&body).unwrap();
+        if !self.available() {
+            return Err(Box::new(RequestError::EndpointReachRateLimit(
+                self.config.url.clone().unwrap_or("UNSET_URL".to_string()),
+            )));
+        }
+        let b = serde_json::to_string(&body);
+        let b = match b {
+            Ok(b) => b,
+            Err(e) => {
+                return Err(Box::new(RequestError::DeserializeRequestError(e)));
+            }
+        };
         debug!("RPC request: {}", &b);
-        let url = self.config.url.clone().unwrap().clone();
+        let url = self.config.url.clone();
+        let url = match url {
+            Some(url) => url,
+            None => {
+                return Err(Box::new(RequestError::UndefinedUrl));
+            }
+        };
+
         for i in 0..self.config.retry {
             let time_start = std::time::Instant::now();
             let response = self
@@ -72,6 +111,7 @@ impl ReqwestClient {
                 .header("Content-Type", "application/json")
                 .send()
                 .await;
+            self.set_last_request();
             let time_duration = time_start.elapsed().as_millis();
             if response.is_err() {
                 debug!(
@@ -81,11 +121,11 @@ impl ReqwestClient {
                 self.iddle().await;
                 continue;
             }
-            let response = response.unwrap();
+            let response = response?;
             let status = response.status().as_u16();
             track_status_code(&url, "POST", status, protocol, network);
             if status != 200 {
-                debug!(
+                error!(
                     "Error: RPC {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
                     url,
                     status,
@@ -101,12 +141,10 @@ impl ReqwestClient {
                 self.iddle().await;
                 continue;
             }
-            trace!("RPC {} response: {:?}", url, response);
-            let txt = response.text().await;
-            trace!("RPC {} response text: {:?}", url, txt);
+            let txt = response.text().await?;
             track_response_time(&url, "POST", protocol, network, time_duration);
             debug!("RPC {} OK", url);
-            let r: Result<T, Error> = serde_json::from_str(&txt?);
+            let r: Result<T, Error> = serde_json::from_str(&txt);
             match r {
                 Ok(r) => return Ok(r),
                 Err(e) => {
@@ -119,16 +157,22 @@ impl ReqwestClient {
     }
 
     pub async fn get<T: DeserializeOwned>(
-        &self,
+        &mut self,
         url: &str,
         protocol: &str,
         network: &str,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
+        if !self.available() {
+            return Err(Box::new(RequestError::EndpointReachRateLimit(
+                self.config.url.clone().unwrap_or("UNSET_URL".to_string()),
+            )));
+        }
         let url = url.to_string();
-        trace!("GET {} request", url);
+        debug!("GET {} request", url);
         for i in 0..self.config.retry {
             let time_start = std::time::Instant::now();
             let response = self.client.get(&url).send().await;
+            self.set_last_request();
             let time_duration = time_start.elapsed().as_millis();
             if response.is_err() {
                 debug!(
