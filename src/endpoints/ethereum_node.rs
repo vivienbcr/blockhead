@@ -5,8 +5,9 @@ use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
+use crate::utils::{deserialize_from_hex_to_u128, deserialize_from_hex_to_u64};
 use async_trait::async_trait;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct EthereumNode {
     pub endpoint: conf::Endpoint,
@@ -203,45 +204,6 @@ pub struct EthBlock {
     pub transactions_root: String,
     pub uncles: Vec<String>,
     pub transactions: Vec<String>,
-}
-
-//FIXME: Should be merge in same function with deserialize_from_hex_to_u128
-pub fn deserialize_from_hex_to_u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    let hex_str = s.trim_start_matches("0x");
-    let z = u64::from_str_radix(hex_str, 16);
-    match z {
-        Ok(z) => Ok(z),
-        Err(e) => {
-            error!("deserialize_from_hex_to_u64 error: {} {}", e, s);
-            Err(serde::de::Error::custom(format!(
-                "deserialize_from_hex_to_u64 error: {} {}",
-                e, s,
-            )))
-        }
-    }
-}
-// FIXME: Should be merge in same function with deserialize_from_hex_to_u64
-pub fn deserialize_from_hex_to_u128<'de, D>(deserializer: D) -> Result<u128, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    let hex_str = s.trim_start_matches("0x");
-    let z = u128::from_str_radix(hex_str, 16);
-    match z {
-        Ok(z) => Ok(z),
-        Err(e) => {
-            error!("deserialize_from_hex_to_u128 error: {} {}", e, s);
-            Err(serde::de::Error::custom(format!(
-                "deserialize_from_hex_to_u128 error:{} {}",
-                e, s,
-            )))
-        }
-    }
 }
 
 #[cfg(test)]

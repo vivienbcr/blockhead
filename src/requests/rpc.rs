@@ -1,6 +1,7 @@
 use super::client::ReqwestClient;
 use crate::{prom::registry::track_response_time, prom::registry::track_status_code};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Error;
 pub const JSON_RPC_VER: &str = "2.0";
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JsonRpcResponse<T> {
@@ -105,8 +106,14 @@ impl ReqwestClient {
             trace!("RPC {} response text: {:?}", url, txt);
             track_response_time(&url, "POST", protocol, network, time_duration);
             debug!("RPC {} OK", url);
-            let r: T = serde_json::from_str(&txt?)?;
-            return Ok(r);
+            let r: Result<T, Error> = serde_json::from_str(&txt?);
+            match r {
+                Ok(r) => return Ok(r),
+                Err(e) => {
+                    error!("Error: RPC decode {} response error: {}", url, e);
+                    return Err(e.into());
+                }
+            }
         }
         return Err(format!("Error: RPC {} fail after {} retry", url, self.config.rate).into());
     }

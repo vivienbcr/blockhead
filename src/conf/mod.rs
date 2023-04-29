@@ -1,8 +1,8 @@
 use crate::{
     endpoints::{
         bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream,
-        ethereum_node::EthereumNode, tezos_node::TezosNode, tzkt::Tzkt, tzstats::TzStats,
-        ProviderActions,
+        ethereum_node::EthereumNode, polkadot_node::PolkadotNode, tezos_node::TezosNode,
+        tzkt::Tzkt, tzstats::TzStats, ProviderActions,
     },
     requests::client::ReqwestClient,
 };
@@ -280,6 +280,8 @@ pub enum Provider {
     EthereumNode(EthereumNode),
     EwfNode(EthereumNode),
     TezosNode(TezosNode),
+    PolkadotNode(PolkadotNode),
+
     Tzkt(Tzkt),
     TzStats(TzStats),
     None,
@@ -349,6 +351,9 @@ impl Provider {
             "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, Protocol::Tezos, n)),
             "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, Protocol::Tezos, n)),
             "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, Protocol::Tezos, n)),
+            "polkadot_node" => {
+                Provider::PolkadotNode(PolkadotNode::new(endpoint_opt, Protocol::Polkadot, n))
+            }
             _ => Provider::None,
         }
     }
@@ -362,6 +367,7 @@ impl Provider {
             Provider::TezosNode(provider) => Some(provider),
             Provider::Tzkt(provider) => Some(provider),
             Provider::TzStats(provider) => Some(provider),
+            Provider::PolkadotNode(provider) => Some(provider),
             _ => None,
         }
     }
@@ -375,6 +381,7 @@ impl Provider {
             "tezos_node" => true,
             "tzkt" => true,
             "tzstats" => true,
+            "polkadot_node" => true,
             _ => false,
         }
     }
@@ -506,6 +513,8 @@ pub enum Protocol {
     Ewf,
     #[serde(rename = "tezos")]
     Tezos,
+    #[serde(rename = "polkadot")]
+    Polkadot,
     #[serde(rename = "None")]
     None,
 }
@@ -517,6 +526,7 @@ impl Protocol {
             "ethereum" => Some(Protocol::Ethereum),
             "ewf" => Some(Protocol::Ewf),
             "tezos" => Some(Protocol::Tezos),
+            "polkadot" => Some(Protocol::Polkadot),
             _ => None,
         }
     }
@@ -526,6 +536,7 @@ impl Protocol {
             Protocol::Ethereum => "ethereum".to_string(),
             Protocol::Ewf => "ewf".to_string(),
             Protocol::Tezos => "tezos".to_string(),
+            Protocol::Polkadot => "polkadot".to_string(),
             Protocol::None => "None".to_string(),
         }
     }
@@ -544,6 +555,8 @@ pub enum Network {
     Volta,
     #[serde(rename = "ghostnet")]
     Ghostnet,
+    #[serde(rename = "kusama")]
+    Kusama,
 }
 impl Network {
     fn from(s: String) -> Option<Self> {
@@ -554,6 +567,7 @@ impl Network {
             "sepolia" => Some(Network::Sepolia),
             "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
+            "kusama" => Some(Network::Kusama),
             _ => None,
         }
     }
@@ -565,6 +579,7 @@ impl Network {
             Network::Sepolia => "sepolia".to_string(),
             Network::Volta => "volta".to_string(),
             Network::Ghostnet => "ghostnet".to_string(),
+            Network::Kusama => "kusama".to_string(),
         }
     }
 }

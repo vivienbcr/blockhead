@@ -26,7 +26,12 @@ async fn ping_handler() -> HttpResponse {
 #[get("/")]
 async fn blockchain_handler(params: web::Query<BlockchainRouteParams>) -> HttpResponse {
     info!("Blockchain route called with params: {:?}", params);
-    let db = DATABASE.get().unwrap();
+    let db = DATABASE.get();
+    if db.is_none() {
+        return HttpResponse::InternalServerError().body("Database not initialized");
+    }
+    let db = db.unwrap();
+
     let proto_net = get_enabled_protocol_network();
 
     if proto_net.is_empty() {
