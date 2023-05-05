@@ -7,6 +7,8 @@ pub mod db;
 pub mod endpoints;
 pub mod prom;
 pub mod requests;
+pub mod utils;
+
 #[cfg(test)]
 pub mod tests;
 

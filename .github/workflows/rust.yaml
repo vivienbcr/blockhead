@@ -14,11 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Build
-        run: cargo build --verbose
-      - name: Run tests
-        run: cargo test --verbose
+      - run: |
+          rustup set auto-self-update disable
+          rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: |
+          cargo check
+          cargo test --verbose
+        working-directory: tests
         env:
           ETHEREUM_NODE_URL: ${{ secrets.ETHEREUM_NODE_URL }}
           BITCOIN_NODE_URL: ${{ secrets.BITCOIN_NODE_URL }}
           TEZOS_NODE_URL: ${{ secrets.TEZOS_NODE_URL }}
+          EWF_NODE_URL: ${{ secrets.EWF_NODE_URL }}

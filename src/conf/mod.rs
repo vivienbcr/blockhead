@@ -1,8 +1,8 @@
 use crate::{
     endpoints::{
         bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream,
-        ethereum_node::EthereumNode, tezos_node::TezosNode, tzkt::Tzkt, tzstats::TzStats,
-        ProviderActions,
+        ethereum_node::EthereumNode, polkadot_node::PolkadotNode, subscan::Subscan,
+        tezos_node::TezosNode, tzkt::Tzkt, tzstats::TzStats, ProviderActions,
     },
     requests::client::ReqwestClient,
 };
@@ -14,12 +14,7 @@ use env_logger::Env;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::{
-    collections::HashMap,
-    ffi::OsString,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, ffi::OsString, path::PathBuf};
 
 pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
 
@@ -278,9 +273,12 @@ pub enum Provider {
     Blockcypher(Blockcypher),
     BitcoinNode(BitcoinNode),
     EthereumNode(EthereumNode),
+    EwfNode(EthereumNode),
     TezosNode(TezosNode),
+    PolkadotNode(PolkadotNode),
     Tzkt(Tzkt),
     TzStats(TzStats),
+    Subscan(Subscan),
     None,
 }
 #[cfg(test)]
@@ -332,13 +330,26 @@ impl Provider {
     pub fn from_str(provider: &str, endpoint_opt: EndpointOptions, network: &Network) -> Provider {
         let n = network.to_owned();
         match provider {
-            "blockstream" => Provider::Blockstream(Blockstream::new(endpoint_opt, n)),
-            "blockcypher" => Provider::Blockcypher(Blockcypher::new(endpoint_opt, n)),
-            "bitcoin_node" => Provider::BitcoinNode(BitcoinNode::new(endpoint_opt, n)),
-            "ethereum_node" => Provider::EthereumNode(EthereumNode::new(endpoint_opt, n)),
-            "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, n)),
-            "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, n)),
-            "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, n)),
+            "blockstream" => {
+                Provider::Blockstream(Blockstream::new(endpoint_opt, Protocol::Bitcoin, n))
+            }
+            "blockcypher" => {
+                Provider::Blockcypher(Blockcypher::new(endpoint_opt, Protocol::Bitcoin, n))
+            }
+            "bitcoin_node" => {
+                Provider::BitcoinNode(BitcoinNode::new(endpoint_opt, Protocol::Bitcoin, n))
+            }
+            "ethereum_node" => {
+                Provider::EthereumNode(EthereumNode::new(endpoint_opt, Protocol::Ethereum, n))
+            }
+            "ewf_node" => Provider::EwfNode(EthereumNode::new(endpoint_opt, Protocol::Ewf, n)),
+            "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, Protocol::Tezos, n)),
+            "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, Protocol::Tezos, n)),
+            "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, Protocol::Tezos, n)),
+            "polkadot_node" => {
+                Provider::PolkadotNode(PolkadotNode::new(endpoint_opt, Protocol::Polkadot, n))
+            }
+            "subscan" => Provider::Subscan(Subscan::new(endpoint_opt, Protocol::Polkadot, n)),
             _ => Provider::None,
         }
     }
@@ -348,9 +359,12 @@ impl Provider {
             Provider::Blockcypher(provider) => Some(provider),
             Provider::BitcoinNode(provider) => Some(provider),
             Provider::EthereumNode(provider) => Some(provider),
+            Provider::EwfNode(provider) => Some(provider),
             Provider::TezosNode(provider) => Some(provider),
             Provider::Tzkt(provider) => Some(provider),
             Provider::TzStats(provider) => Some(provider),
+            Provider::PolkadotNode(provider) => Some(provider),
+            Provider::Subscan(provider) => Some(provider),
             _ => None,
         }
     }
@@ -360,9 +374,12 @@ impl Provider {
             "blockcypher" => true,
             "bitcoin_node" => true,
             "ethereum_node" => true,
+            "ewf_node" => true,
             "tezos_node" => true,
             "tzkt" => true,
             "tzstats" => true,
+            "polkadot_node" => true,
+            "subscan" => true,
             _ => false,
         }
     }
@@ -410,11 +427,61 @@ pub struct ProviderOptsConfigF {
     pub retry: Option<u32>,
     pub delay: Option<u32>,
     pub rate: Option<u32>,
+    #[serde(deserialize_with = "deserialize_string_hashmap")]
+    #[serde(default = "default_headers")]
+    pub headers: Option<HashMap<String, String>>,
+    pub basic_auth: Option<BasicAuth>,
 }
+fn default_headers() -> Option<HashMap<String, String>> {
+    None
+}
+// deserialize_string_hashmap is used to deserialize headers from config file, any value should be converted to string
+fn deserialize_string_hashmap<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<String, String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let map: HashMap<String, serde_json::Value> = HashMap::deserialize(deserializer)?;
+    if map.is_empty() {
+        return Ok(None);
+    }
+    let mut string_map: HashMap<String, String> = HashMap::new();
+    for (key, value) in map {
+        let value = match value {
+            serde_json::Value::Number(n) => {
+                if n.is_i64() {
+                    n.as_i64().unwrap().to_string()
+                } else if n.is_u64() {
+                    n.as_u64().unwrap().to_string()
+                } else if n.is_f64() {
+                    n.as_f64().unwrap().to_string()
+                } else {
+                    n.as_f64().unwrap().to_string()
+                }
+            }
+            serde_json::Value::String(s) => s,
+            _ => value.to_string(),
+        };
+
+        string_map.insert(key, value);
+    }
+    Ok(Some(string_map))
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProviderConfigF {
     pub url: Option<String>,
     pub options: Option<ProviderOptsConfigF>,
+}
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct BasicAuth {
+    #[serde(default = "default_basic_auth_username")]
+    pub username: String,
+    pub password: String,
+}
+pub fn default_basic_auth_username() -> String {
+    String::from("")
 }
 
 /**
@@ -431,6 +498,8 @@ pub struct EndpointOptions {
     pub delay: u32,
     #[serde(default = "default_endpoint_request_rate")]
     pub rate: u32,
+    pub headers: Option<HashMap<String, String>>,
+    pub basic_auth: Option<BasicAuth>,
 }
 impl Default for EndpointOptions {
     fn default() -> Self {
@@ -442,6 +511,8 @@ impl Default for EndpointOptions {
                 retry: DEFAULT_ENDPOINT_RETRY,
                 delay: DEFAULT_ENDPOINT_DELAY,
                 rate: DEFAULT_ENDPOINT_REQUEST_RATE,
+                headers: None,
+                basic_auth: None,
             },
         }
     }
@@ -470,16 +541,28 @@ impl EndpointOptions {
             if let Some(rate) = options.rate {
                 endpoint_opt.rate = rate;
             }
+            if let Some(headers) = options.headers {
+                endpoint_opt.headers = Some(headers);
+            }
+            if let Some(basic_auth) = options.basic_auth {
+                endpoint_opt.basic_auth = Some(basic_auth);
+            }
         }
         endpoint_opt
     }
     #[cfg(test)]
-    pub fn test_new(url: &str) -> Self {
+    pub fn test_new(
+        url: &str,
+        headers: Option<HashMap<String, String>>,
+        basic_auth: Option<BasicAuth>,
+    ) -> Self {
         EndpointOptions {
             url: Some(url.to_string()),
-            retry: 3,
+            retry: 10,
             delay: 1,
-            rate: 5,
+            rate: 0,
+            headers: headers,
+            basic_auth: basic_auth,
         }
     }
 }
@@ -490,8 +573,12 @@ pub enum Protocol {
     Bitcoin,
     #[serde(rename = "ethereum")]
     Ethereum,
+    #[serde(rename = "ewf")]
+    Ewf,
     #[serde(rename = "tezos")]
     Tezos,
+    #[serde(rename = "polkadot")]
+    Polkadot,
     #[serde(rename = "None")]
     None,
 }
@@ -501,7 +588,9 @@ impl Protocol {
         match s.as_str() {
             "bitcoin" => Some(Protocol::Bitcoin),
             "ethereum" => Some(Protocol::Ethereum),
+            "ewf" => Some(Protocol::Ewf),
             "tezos" => Some(Protocol::Tezos),
+            "polkadot" => Some(Protocol::Polkadot),
             _ => None,
         }
     }
@@ -509,7 +598,9 @@ impl Protocol {
         match self {
             Protocol::Bitcoin => "bitcoin".to_string(),
             Protocol::Ethereum => "ethereum".to_string(),
+            Protocol::Ewf => "ewf".to_string(),
             Protocol::Tezos => "tezos".to_string(),
+            Protocol::Polkadot => "polkadot".to_string(),
             Protocol::None => "None".to_string(),
         }
     }
@@ -524,8 +615,12 @@ pub enum Network {
     Goerli,
     #[serde(rename = "sepolia")]
     Sepolia,
+    #[serde(rename = "volta")]
+    Volta,
     #[serde(rename = "ghostnet")]
     Ghostnet,
+    #[serde(rename = "kusama")]
+    Kusama,
 }
 impl Network {
     fn from(s: String) -> Option<Self> {
@@ -534,7 +629,9 @@ impl Network {
             "testnet" => Some(Network::Testnet),
             "goerli" => Some(Network::Goerli),
             "sepolia" => Some(Network::Sepolia),
+            "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
+            "kusama" => Some(Network::Kusama),
             _ => None,
         }
     }
@@ -544,7 +641,9 @@ impl Network {
             Network::Testnet => "testnet".to_string(),
             Network::Goerli => "goerli".to_string(),
             Network::Sepolia => "sepolia".to_string(),
+            Network::Volta => "volta".to_string(),
             Network::Ghostnet => "ghostnet".to_string(),
+            Network::Kusama => "kusama".to_string(),
         }
     }
 }
@@ -556,44 +655,30 @@ pub struct Endpoint {
     #[serde(skip)]
     pub network: Network,
     #[serde(skip)]
+    pub protocol: Protocol,
+    #[serde(skip)]
     pub last_request: u64,
 }
 impl Endpoint {
     #[cfg(test)]
-    pub fn test_new(url: &str, net: Network) -> Self {
-        let opt = EndpointOptions::test_new(url);
+    pub fn test_new(
+        url: &str,
+        proto: Protocol,
+        net: Network,
+        headers: Option<HashMap<String, String>>,
+        basic_auth: Option<BasicAuth>,
+    ) -> Self {
+        let opt = EndpointOptions::test_new(url, headers, basic_auth);
         Endpoint {
             last_request: 0,
             url: url.to_string(),
+            protocol: proto,
             network: net,
             reqwest: Some(ReqwestClient::new(opt)),
         }
     }
 }
-impl EndpointActions for Endpoint {
-    fn set_last_request(&mut self) {
-        self.last_request = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-    }
-    fn available(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-        let diff = now - self.last_request;
-        if diff < self.reqwest.clone().unwrap().config.rate as u64 {
-            debug!("Rate limit reached for {} ({}s)", self.url, diff);
-            return false;
-        }
-        true
-    }
-}
-pub trait EndpointActions {
-    fn set_last_request(&mut self);
-    fn available(&self) -> bool;
-}
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum LogLevel {
     Info,
@@ -754,11 +839,28 @@ mod test {
             endpoint.rate, DEFAULT_ENDPOINT_REQUEST_RATE,
             "rate should match with default value"
         );
+        assert_eq!(
+            endpoint.headers, None,
+            "headers should match with default value"
+        );
+        assert!(
+            endpoint.basic_auth.is_none(),
+            "basic_auth should match with default value"
+        );
+
+        let headers: HashMap<String, String> =
+            HashMap::from([("X-API-KEY".to_string(), "some_key".to_string())]);
+        let basic_auth = BasicAuth {
+            username: "user".to_string(),
+            password: "pass".to_string(),
+        };
 
         let provider_options_f = ProviderOptsConfigF {
             retry: Some(40),
             delay: None,
             rate: Some(60),
+            headers: Some(headers),
+            basic_auth: Some(basic_auth),
         };
 
         let provider_config_f = ProviderConfigF {
@@ -778,6 +880,23 @@ mod test {
             "delay should not change"
         );
         assert_eq!(merge.rate, 60, "rate should match with overriden value");
+        let merged_header = merge.headers.unwrap();
+        assert_eq!(merged_header.contains_key("X-API-KEY"), true);
+        assert_eq!(
+            merged_header.get("X-API-KEY"),
+            Some(&"some_key".to_string())
+        );
+        let merged_basic_auth = merge.basic_auth.unwrap();
+        assert_eq!(
+            merged_basic_auth.username,
+            "user".to_string(),
+            "username should match with overriden value"
+        );
+        assert_eq!(
+            merged_basic_auth.password,
+            "pass".to_string(),
+            "password should match with overriden value"
+        );
     }
 
     #[test]
@@ -864,6 +983,14 @@ mod test {
             e.config.delay, config.global.endpoints.delay,
             "First Bitcoin mainnet rpc url should be set"
         );
+        let merged_header = e.config.headers.unwrap();
+        assert_eq!(merged_header.contains_key("X-API-Key"), true);
+        assert_eq!(merged_header.get("X-API-Key"), Some(&"10".to_string()));
+        assert_eq!(merged_header.contains_key("ANOTHER-NUM-HEADER"), true);
+        assert_eq!(
+            merged_header.get("ANOTHER-NUM-HEADER"),
+            Some(&"11".to_string())
+        );
 
         // Test second bitcoin mainnet rpc url with overriden values
         let b = bitcoin_mainnet_rpc_providers
@@ -889,6 +1016,10 @@ mod test {
             e.config.delay, 14,
             "First Bitcoin mainnet rpc url should be set"
         );
+
+        let basic_auth = e.config.basic_auth.unwrap();
+        assert_eq!(basic_auth.username, "user".to_string());
+        assert_eq!(basic_auth.password, "pass".to_string());
         // Test bitcoin mainnet blockstream
         let bitcoin_mainnet_blockstream_url = "https://sample-url-3.com";
         let bitcoin_mainnet_blockstream_providers = get_blockstream(bitcoin_mainnet_providers);

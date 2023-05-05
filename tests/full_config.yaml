@@ -31,11 +31,18 @@ protocols:
         head_length: 9
       rpc:
       - url: https://rpc-bitcoin-mainnet-1.com
+        options:
+          headers:
+            X-API-Key: "10"
+            ANOTHER-NUM-HEADER: 11
       - url: https://rpc-bitcoin-mainnet-2.com
         options:
           retry: 13
           delay: 14
           rate: 15
+          basic_auth:
+            username: user
+            password: pass
       blockstream:
         url: https://sample-url-3.com
         options:

@@ -4,9 +4,12 @@ pub mod bitcoin_node;
 pub mod blockcypher;
 pub mod blockstream;
 pub mod ethereum_node;
+pub mod polkadot_node;
+pub mod subscan;
 pub mod tezos_node;
 pub mod tzkt;
 pub mod tzstats;
+
 #[async_trait]
 pub trait ProviderActions: Send {
     // parse_top_blocks return basic task to parse top blocks

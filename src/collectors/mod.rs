@@ -43,7 +43,7 @@ pub async fn runner(
             .filter_map(|r| match r {
                 Ok(b) => Some(b),
                 Err(e) => {
-                    trace!("Error : {:?}", e);
+                    info!("Scrapping err  : {:?}", e);
                     None
                 }
             })

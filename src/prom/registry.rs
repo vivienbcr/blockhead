@@ -24,6 +24,14 @@ pub fn register_custom_metrics() {
         .expect("collector can be registered");
 }
 pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &str, network: &str) {
+    trace!(
+        "track status code {} {} {} {} {}",
+        url,
+        method,
+        status_code,
+        protocol,
+        network
+    );
     // retain only https://domain.tld
     let base_domain = get_base_url(url);
     metrics::HTTP_REQUEST_CODE
@@ -36,8 +44,14 @@ pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &s
         ])
         .inc();
 }
-
-pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &str, time: u128) {
+//TODO: Use protocol enum and network enum
+pub fn track_response_time(
+    url: &str,
+    method: &reqwest::Method,
+    protocol: &str,
+    network: &str,
+    time: u128,
+) {
     // retain only https://domain.tld
     let base_domain = get_base_url(url);
     trace!(
@@ -49,7 +63,7 @@ pub fn track_response_time(url: &str, method: &str, protocol: &str, network: &st
         time as f64
     );
     metrics::ENDPOINT_RESPONSE_TIME
-        .with_label_values(&[&base_domain, method, protocol, network])
+        .with_label_values(&[&base_domain, &method.to_string(), protocol, network])
         .observe(time as f64);
 }
 
