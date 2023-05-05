@@ -175,13 +175,10 @@ fn decode_timestamp_extrinsic(extrinsic: &[u8]) -> Option<u64> {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 struct PolkadotBlockHeader {
-    // #[serde(rename = "parentHash")]
     parent_hash: String,
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     number: u64,
-    // #[serde(rename = "stateRoot")]
     state_root: String,
-    // #[serde(rename = "extrinsicsRoot")]
     extrinsics_root: String,
     digest: serde_json::Value,
 }
@@ -194,7 +191,7 @@ struct PolkadotBlock {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct PolkadotBlockResponse {
     block: PolkadotBlock,
-    justifications: Option<String>,
+    justifications: serde_json::Value,
 }
 
 #[cfg(test)]

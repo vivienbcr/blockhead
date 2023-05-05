@@ -7,5 +7,6 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml
     entrypoint: [ "/app/blockhead", "-c", "config.yaml" ]
+    restart: always
 volumes:
   config.yaml: {}

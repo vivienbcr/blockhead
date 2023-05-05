@@ -229,13 +229,14 @@ mod tests {
             blockchain.blocks.len()
         );
         utils::assert_blockchain(blockchain);
-        let blockchain = subscan.parse_top_blocks(20, Some(last_hash.clone())).await;
+        // should return less blocks than requested (head is recent header)
+        let blockchain = subscan.parse_top_blocks(40, Some(last_hash.clone())).await;
         if blockchain.is_ok() {
             let blockchain = blockchain.unwrap();
             assert!(
-                blockchain.blocks.len() < 20,
+                blockchain.blocks.len() < 40,
                 "Subscan should return less blocks than requested, {} expected, {} returned",
-                20,
+                40,
                 blockchain.blocks.len()
             );
         } else {
