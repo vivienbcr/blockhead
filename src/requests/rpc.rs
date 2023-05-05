@@ -127,8 +127,9 @@ impl ReqwestClient {
                 return Err(Box::new(RequestError::UndefinedUrl));
             }
         };
-
+        let mut c = 0;
         for i in 0..self.config.retry {
+            c += i;
             let time_start = std::time::Instant::now();
             let client = Client::new();
             let headers = self.get_headers();
@@ -141,7 +142,7 @@ impl ReqwestClient {
             let time_duration = time_start.elapsed().as_millis();
             if response.is_err() {
                 debug!(
-                    "Error: rpc request {} error, retrying in {} seconds, tries {} on {} ",
+                    "rpc request {} error, retrying in {} seconds, tries {} on {} ",
                     &b, self.config.rate, i, self.config.retry
                 );
                 self.iddle().await;
@@ -152,17 +153,8 @@ impl ReqwestClient {
             track_status_code(&url, "POST", status, protocol, network);
             if status != 200 {
                 error!(
-                    "Error: RPC {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
-                    url,
-                    status,
-                    self.config
-                        .rate
-                        ,
-                    i,
-                    self.config
-                        .retry
-                        ,
-                    &b
+                    "rpc {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
+                    url, status, self.config.rate, i, self.config.retry, &b
                 );
                 self.iddle().await;
                 continue;
@@ -179,15 +171,12 @@ impl ReqwestClient {
             match r {
                 Ok(r) => return Ok(r),
                 Err(e) => {
-                    error!(
-                        "Error: RPC decode {} response error: {}\nraw : {}",
-                        url, e, &txt
-                    );
+                    error!("rpc decode {} response error: {}\nraw : {}", url, e, &txt);
                     return Err(e.into());
                 }
             }
         }
-        return Err(format!("Error: RPC {} fail after {} retry", url, self.config.rate).into());
+        return Err(format!("rpc {} fail after {} retry", &url, &c).into());
     }
 
     pub async fn run_request<T: DeserializeOwned>(
@@ -205,7 +194,9 @@ impl ReqwestClient {
         }
 
         let url = url.to_string();
+        let mut c = 0;
         for i in 0..self.config.retry {
+            c += i;
             let time_start = std::time::Instant::now();
             let client = Client::new();
             let headers = self.get_headers();
@@ -237,7 +228,7 @@ impl ReqwestClient {
 
             if status != 200 {
                 error!(
-                    "Error: '{} {} status code {}, retrying in {} seconds, tries {} on {} ",
+                    "{} {} status code {}, retrying in {} seconds, tries {} on {} ",
                     &method, url, status, self.config.rate, i, self.config.retry
                 );
                 self.iddle().await;
@@ -249,7 +240,7 @@ impl ReqwestClient {
                 Ok(r_txt) => r_txt,
                 Err(e) => {
                     error!(
-                        "Error: {} {} response error: {}, retrying in {} seconds, tries {} on {} ",
+                        "{} {} response error: {}, retrying in {} seconds, tries {} on {} ",
                         &method, url, e, self.config.rate, i, self.config.retry
                     );
                     self.iddle().await;
@@ -261,7 +252,7 @@ impl ReqwestClient {
                 Ok(r) => r,
                 Err(e) => {
                     debug!(
-                        "Error: {} {} response decode error: {}, retrying in {} seconds, tries {} on {}\nraw: {} ",
+                        "{} {} response decode error: {}, retrying in {} seconds, tries {} on {}\nraw: {} ",
                         &method, url, e, self.config.rate, i, self.config.retry, &r_txt
                     );
                     self.iddle().await;
@@ -270,11 +261,7 @@ impl ReqwestClient {
             };
             return Ok(r);
         }
-        return Err(format!(
-            "Error: {} {} fail after {} retry",
-            &method, url, self.config.rate
-        )
-        .into());
+        return Err(format!("{} {} fail after {} retry", &method, &url, &c).into());
     }
 }
 
