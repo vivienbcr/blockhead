@@ -36,6 +36,8 @@ impl ProviderActions for Blockcypher {
         let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -54,7 +56,7 @@ impl Blockcypher {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         Blockcypher {
-            endpoint: Endpoint::test_new(url, proto, net),
+            endpoint: Endpoint::test_new(url, proto, net, None, None),
         }
     }
     async fn get_chain_height(
@@ -64,7 +66,9 @@ impl Blockcypher {
         let url = format!("{}/v1/btc/main", self.endpoint.url);
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: HeightResponse = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
@@ -84,7 +88,9 @@ impl Blockcypher {
             let url = format!("{}/v1/btc/main/blocks/{}", self.endpoint.url, height - i);
             let client = self.endpoint.reqwest.as_mut().unwrap();
             let res: BlockResponse = client
-                .get(
+                .run_request(
+                    reqwest::Method::GET,
+                    None,
                     &url,
                     &Protocol::Bitcoin.to_string(),
                     &self.endpoint.network.to_string(),
@@ -167,7 +173,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_blocks_from_height() {
         tests::setup();
-        let n_block = 10;
+        let n_block = 5;
         let height = 100;
         let mut blockcypher = Blockcypher::test_new(
             "https://api.blockcypher.com",

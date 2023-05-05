@@ -35,7 +35,7 @@ impl TemplateNode {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: crate::conf::Network) -> Self {
         TemplateNode {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
 }
@@ -51,13 +51,12 @@ impl ProviderActions for TemplateNode {
             n_block,
             previous_head
         );
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
+
         let previous_head = previous_head.unwrap_or("".to_string());
 
         blockchain.sort();
-        self.endpoint.set_last_request();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }

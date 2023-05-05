@@ -35,7 +35,7 @@ impl PolkadotNode {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: crate::conf::Network) -> Self {
         PolkadotNode {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
 }
@@ -87,6 +87,8 @@ impl ProviderActions for PolkadotNode {
             blockchain.add_block(b);
         }
         blockchain.sort();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }

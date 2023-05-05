@@ -48,6 +48,8 @@ impl ProviderActions for EthereumNode {
             });
         }
         blockchain.sort();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -66,7 +68,7 @@ impl EthereumNode {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         EthereumNode {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
     pub async fn get_block_by_number(

@@ -53,6 +53,8 @@ impl ProviderActions for Blockstream {
         if blockchain.blocks.len() > nb_blocks as usize {
             blockchain.blocks.truncate(nb_blocks as usize);
         }
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -79,7 +81,9 @@ impl Blockstream {
         let url = format!("{}/blocks/{}", self.endpoint.url, height);
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: Vec<Block> = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
@@ -92,7 +96,9 @@ impl Blockstream {
         let url = format!("{}/blocks/tip", self.endpoint.url);
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: Vec<Block> = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),

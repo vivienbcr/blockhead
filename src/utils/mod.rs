@@ -45,13 +45,18 @@ pub fn assert_blockchain(b: blockchain::Blockchain) {
     // for each block in blockchain
     // next block height should be previous block height - i
     let previous_block_height = b.blocks[0].height;
-    println!("{}", serde_json::to_string_pretty(&b).unwrap());
     for (i, block) in b.blocks.iter().enumerate() {
-        println!(
-            "assert block height: {} with {}",
+        debug!(
+            "block height: {} should be {}",
             block.height,
             previous_block_height - i as u64
         );
-        assert_eq!(block.height, previous_block_height - i as u64);
+        assert_eq!(
+            block.height,
+            previous_block_height - i as u64,
+            "block height: {} should be {}",
+            block.height,
+            previous_block_height - i as u64
+        );
     }
 }

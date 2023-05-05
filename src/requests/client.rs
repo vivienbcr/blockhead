@@ -1,12 +1,9 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use reqwest::Client;
-
 use crate::conf::EndpointOptions;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub struct ReqwestClient {
-    pub client: Client,
+    // pub client: Client,
     pub config: EndpointOptions,
     pub last_request: u64,
 }
@@ -14,7 +11,6 @@ pub struct ReqwestClient {
 impl ReqwestClient {
     pub fn new(config: EndpointOptions) -> ReqwestClient {
         ReqwestClient {
-            client: Client::new(),
             config,
             last_request: 0,
         }

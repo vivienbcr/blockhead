@@ -27,7 +27,7 @@ impl Tzkt {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: crate::conf::Network) -> Self {
         Tzkt {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
 }
@@ -76,6 +76,8 @@ impl ProviderActions for Tzkt {
             i += 1;
         }
         blockchain.sort();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -88,7 +90,9 @@ impl Tzkt {
         );
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: Vec<TzktHead> = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &Protocol::Tezos.to_string(),
                 &self.endpoint.network.to_string(),
@@ -110,7 +114,9 @@ impl Tzkt {
         );
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: TzktBlockFull = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &Protocol::Tezos.to_string(),
                 &self.endpoint.network.to_string(),

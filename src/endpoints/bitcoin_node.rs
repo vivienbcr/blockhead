@@ -33,7 +33,7 @@ impl BitcoinNode {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         BitcoinNode {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
 }
@@ -99,7 +99,8 @@ impl ProviderActions for BitcoinNode {
             return Err("Error: build blockchain is less than n_block".into());
         }
         blockchain.sort();
-        // self.endpoint.set_last_request();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }

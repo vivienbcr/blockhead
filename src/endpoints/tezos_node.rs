@@ -28,7 +28,7 @@ impl TezosNode {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         TezosNode {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
 }
@@ -84,7 +84,8 @@ impl ProviderActions for TezosNode {
         }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
-
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -104,7 +105,9 @@ impl TezosNode {
         );
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: TezosBlock = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &Protocol::Tezos.to_string(),
                 &self.endpoint.network.to_string(),
