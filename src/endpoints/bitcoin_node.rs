@@ -1,7 +1,7 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
 
-use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
+use crate::conf::{self, Endpoint, Network, Protocol};
 
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
@@ -33,7 +33,7 @@ impl BitcoinNode {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         BitcoinNode {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
 }
@@ -50,9 +50,9 @@ impl ProviderActions for BitcoinNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
+        // if !self.endpoint.available() {
+        //     return Err("Error: Endpoint not available".into());
+        // }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
 
         let bbh_res = self.get_best_block_hash().await;
@@ -72,7 +72,6 @@ impl ProviderActions for BitcoinNode {
             trace!("compare {} and {}", prev_head, best_block_hash);
             if prev_head == best_block_hash {
                 debug!("No new block (head: {}), skip task", best_block_hash);
-                self.endpoint.set_last_request();
                 return Err("No new block".into());
             }
         }
@@ -100,14 +99,15 @@ impl ProviderActions for BitcoinNode {
             return Err("Error: build blockchain is less than n_block".into());
         }
         blockchain.sort();
-        self.endpoint.set_last_request();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
 
 impl BitcoinNode {
     pub async fn get_best_block_hash(
-        &self,
+        &mut self,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get best block hash for {}", self.endpoint.url);
         let body = JsonRpcReqBody::Single(JsonRpcReq {
@@ -116,7 +116,7 @@ impl BitcoinNode {
             method: "getbestblockhash".to_string(),
             params: vec![],
         });
-        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: JsonRpcResponse<String> = client
             .rpc(
                 &body,
@@ -127,7 +127,7 @@ impl BitcoinNode {
         Ok(res.result.unwrap())
     }
     pub async fn get_block(
-        &self,
+        &mut self,
         hash: &str,
     ) -> Result<Getblock, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get block for {}", self.endpoint.url);
@@ -140,7 +140,7 @@ impl BitcoinNode {
                 JsonRpcParams::Number(1),
             ],
         });
-        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: JsonRpcResponse<Getblock> = client
             .rpc(
                 &body,
@@ -214,7 +214,8 @@ mod test {
     async fn test_get_best_block_hash() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
-        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
+        let mut bitcoin_node =
+            BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
         let res = bitcoin_node.get_best_block_hash().await;
         assert!(
             res.is_ok(),
@@ -227,7 +228,8 @@ mod test {
     async fn test_get_block() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
-        let bitcoin_node = BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
+        let mut bitcoin_node =
+            BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
         let res = bitcoin_node
             .get_block(&"00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce")
             .await;

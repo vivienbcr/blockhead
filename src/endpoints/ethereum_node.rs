@@ -1,12 +1,13 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
-use crate::conf::{self, Endpoint, EndpointActions, EndpointOptions, Network, Protocol};
+use crate::conf::{self, Endpoint, EndpointOptions, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
 };
+use crate::utils::{deserialize_from_hex_to_u128, deserialize_from_hex_to_u64};
 use async_trait::async_trait;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct EthereumNode {
     pub endpoint: conf::Endpoint,
@@ -18,9 +19,6 @@ impl ProviderActions for EthereumNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let head = self.get_block_by_number(None, false).await?.pop().unwrap();
 
@@ -30,7 +28,6 @@ impl ProviderActions for EthereumNode {
                     "No new block (head: {} block with hash {}), skip task",
                     head.number, head.hash
                 );
-                self.endpoint.set_last_request();
                 return Err("No new block".into());
             }
         }
@@ -51,7 +48,8 @@ impl ProviderActions for EthereumNode {
             });
         }
         blockchain.sort();
-        self.endpoint.set_last_request();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -70,7 +68,7 @@ impl EthereumNode {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         EthereumNode {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
     pub async fn get_block_by_number(
@@ -108,7 +106,7 @@ impl EthereumNode {
                 JsonRpcReqBody::Single(body)
             }
         };
-        let reqwest = self.endpoint.reqwest.as_ref().unwrap();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
 
         let res = match req {
             JsonRpcReqBody::Single(_) => {
@@ -203,45 +201,6 @@ pub struct EthBlock {
     pub transactions_root: String,
     pub uncles: Vec<String>,
     pub transactions: Vec<String>,
-}
-
-//FIXME: Should be merge in same function with deserialize_from_hex_to_u128
-pub fn deserialize_from_hex_to_u64<'de, D>(deserializer: D) -> Result<u64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    let hex_str = s.trim_start_matches("0x");
-    let z = u64::from_str_radix(hex_str, 16);
-    match z {
-        Ok(z) => Ok(z),
-        Err(e) => {
-            error!("deserialize_from_hex_to_u64 error: {} {}", e, s);
-            Err(serde::de::Error::custom(format!(
-                "deserialize_from_hex_to_u64 error: {} {}",
-                e, s,
-            )))
-        }
-    }
-}
-// FIXME: Should be merge in same function with deserialize_from_hex_to_u64
-pub fn deserialize_from_hex_to_u128<'de, D>(deserializer: D) -> Result<u128, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    let hex_str = s.trim_start_matches("0x");
-    let z = u128::from_str_radix(hex_str, 16);
-    match z {
-        Ok(z) => Ok(z),
-        Err(e) => {
-            error!("deserialize_from_hex_to_u128 error: {} {}", e, s);
-            Err(serde::de::Error::custom(format!(
-                "deserialize_from_hex_to_u128 error:{} {}",
-                e, s,
-            )))
-        }
-    }
 }
 
 #[cfg(test)]

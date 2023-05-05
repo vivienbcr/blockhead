@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::{
     commons::blockchain::{self, Block},
-    conf::{Endpoint, EndpointActions, EndpointOptions, Network, Protocol},
+    conf::{Endpoint, EndpointOptions, Network, Protocol},
     requests::client::ReqwestClient,
 };
 
@@ -22,9 +22,6 @@ impl ProviderActions for Blockcypher {
         nb_blocks: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let chain_state = self.get_chain_height().await?;
         if let Some(previous_head) = previous_head {
             if previous_head == chain_state.hash {
@@ -32,7 +29,6 @@ impl ProviderActions for Blockcypher {
                     "No new block (head: {} block with hash {}), skip task",
                     chain_state.height, chain_state.hash
                 );
-                self.endpoint.set_last_request();
                 return Err("No new block".into());
             }
         }
@@ -40,8 +36,8 @@ impl ProviderActions for Blockcypher {
         let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
-        self.endpoint.set_last_request();
-
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -60,7 +56,7 @@ impl Blockcypher {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         Blockcypher {
-            endpoint: Endpoint::test_new(url, proto, net),
+            endpoint: Endpoint::test_new(url, proto, net, None, None),
         }
     }
     async fn get_chain_height(
@@ -70,7 +66,9 @@ impl Blockcypher {
         let url = format!("{}/v1/btc/main", self.endpoint.url);
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: HeightResponse = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
@@ -90,7 +88,9 @@ impl Blockcypher {
             let url = format!("{}/v1/btc/main/blocks/{}", self.endpoint.url, height - i);
             let client = self.endpoint.reqwest.as_mut().unwrap();
             let res: BlockResponse = client
-                .get(
+                .run_request(
+                    reqwest::Method::GET,
+                    None,
                     &url,
                     &Protocol::Bitcoin.to_string(),
                     &self.endpoint.network.to_string(),
@@ -173,7 +173,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_blocks_from_height() {
         tests::setup();
-        let n_block = 10;
+        let n_block = 5;
         let height = 100;
         let mut blockcypher = Blockcypher::test_new(
             "https://api.blockcypher.com",

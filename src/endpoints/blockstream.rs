@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     commons::blockchain,
-    conf::{self, Endpoint, EndpointActions, Protocol},
+    conf::{self, Endpoint, Protocol},
     requests::client::ReqwestClient,
 };
 
@@ -21,9 +21,6 @@ impl ProviderActions for Blockstream {
         nb_blocks: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let tip = self.get_chain_tip().await?;
         if let Some(previous_head) = previous_head {
@@ -32,7 +29,6 @@ impl ProviderActions for Blockstream {
                     "No new block (head: {} block with hash {}), skip task",
                     tip.height, tip.id
                 );
-                self.endpoint.set_last_request();
                 return Err("No new block".into());
             }
         }
@@ -52,12 +48,13 @@ impl ProviderActions for Blockstream {
             height = height - 10;
             blocks = self.get_blocks_from_height(height).await?;
         }
-        self.endpoint.set_last_request();
         blockchain.sort();
         // remove blocks to return vec len = nb_blocks
         if blockchain.blocks.len() > nb_blocks as usize {
             blockchain.blocks.truncate(nb_blocks as usize);
         }
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
@@ -78,13 +75,15 @@ impl Blockstream {
         Blockstream { endpoint }
     }
     async fn get_blocks_from_height(
-        &self,
+        &mut self,
         height: u64,
     ) -> Result<Vec<Block>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/{}", self.endpoint.url, height);
-        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: Vec<Block> = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),
@@ -93,11 +92,13 @@ impl Blockstream {
         Ok(res)
     }
 
-    async fn get_chain_tip(&self) -> Result<Block, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_chain_tip(&mut self) -> Result<Block, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/tip", self.endpoint.url);
-        let client = self.endpoint.reqwest.as_ref().unwrap();
+        let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: Vec<Block> = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &conf::Protocol::Bitcoin.to_string(),
                 &self.endpoint.network.to_string(),

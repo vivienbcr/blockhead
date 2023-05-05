@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain::{self, Block};
 
-use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
+use crate::conf::{self, Endpoint, Network, Protocol};
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -27,7 +27,7 @@ impl TzStats {
     #[cfg(test)]
     pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
         TzStats {
-            endpoint: conf::Endpoint::test_new(url, proto, net),
+            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
         }
     }
     async fn get_block(
@@ -38,7 +38,9 @@ impl TzStats {
         let url = format!("{}/explorer/block/{}", self.endpoint.url, q);
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let head: TzStatsBlock = client
-            .get(
+            .run_request(
+                reqwest::Method::GET,
+                None,
                 &url,
                 &Protocol::Tezos.to_string(),
                 &self.endpoint.network.to_string(),
@@ -59,9 +61,6 @@ impl ProviderActions for TzStats {
             n_block,
             previous_head
         );
-        if !self.endpoint.available() {
-            return Err("Error: Endpoint not available".into());
-        }
         let head = self.get_block(None).await?;
         let previous_head: String = previous_head.unwrap_or("".to_string());
         if previous_head == head.hash {
@@ -69,7 +68,6 @@ impl ProviderActions for TzStats {
                 "No new block (head: {} block with hash {}), skip task",
                 head.height, head.hash
             );
-            self.endpoint.set_last_request();
             return Err("No new block".into());
         }
         let head_block = Block {
@@ -99,6 +97,8 @@ impl ProviderActions for TzStats {
             i += 1;
         }
         blockchain.sort();
+        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        reqwest.set_last_request();
         Ok(blockchain)
     }
 }
