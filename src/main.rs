@@ -8,7 +8,7 @@ pub mod endpoints;
 pub mod prom;
 pub mod requests;
 pub mod utils;
-
+use actix_cors::Cors;
 #[cfg(test)]
 pub mod tests;
 
@@ -58,6 +58,7 @@ async fn main() -> std::io::Result<()> {
         default_panic(info);
         std::process::exit(1);
     }));
+
     let metrics_port = config.global.metrics.port;
     let server_port = config.global.server.port;
     info!(
@@ -69,16 +70,34 @@ async fn main() -> std::io::Result<()> {
         server_port
     );
     let metrics_server = HttpServer::new(move || {
+        // // FIXME: cors from config
+        let cors = Cors::default()
+            .allow_any_origin()
+            .send_wildcard()
+            .allowed_methods(vec!["GET"])
+            .max_age(3600);
         App::new()
+            .wrap(cors)
             .wrap(middleware::Compress::default())
+            .wrap(middleware::Logger::default())
             .service(metrics::prometheus_handler)
     })
     .bind(("0.0.0.0", metrics_port))?
     .run();
     let api = HttpServer::new(move || {
+        //FIXME: cors from config
+        let cors = Cors::default()
+            .allow_any_origin()
+            .send_wildcard()
+            .allowed_methods(vec!["GET"])
+            .max_age(3600);
         App::new()
+            .wrap(cors)
             .wrap(middleware::Compress::default())
-            .service(app::blockchain_handler)
+            .wrap(middleware::Logger::default())
+            .service(app::protocols_handler)
+            .service(app::protocol_handler)
+            .service(app::protocol_net_handler)
     })
     .bind(("0.0.0.0", server_port))?
     .run();

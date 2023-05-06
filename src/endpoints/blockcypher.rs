@@ -63,7 +63,7 @@ impl Blockcypher {
         &mut self,
     ) -> Result<HeightResponse, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get head blockcypher");
-        let url = format!("{}/v1/btc/main", self.endpoint.url);
+        let url = format!("{}", self.endpoint.url);
         let client = self.endpoint.reqwest.as_mut().unwrap();
         let res: HeightResponse = client
             .run_request(
@@ -85,7 +85,7 @@ impl Blockcypher {
         // just get blocks one by one
         let mut blocks = Vec::new();
         for i in 0..n_block {
-            let url = format!("{}/v1/btc/main/blocks/{}", self.endpoint.url, height - i);
+            let url = format!("{}/blocks/{}", self.endpoint.url, height - i);
             let client = self.endpoint.reqwest.as_mut().unwrap();
             let res: BlockResponse = client
                 .run_request(

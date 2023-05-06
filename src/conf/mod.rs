@@ -46,7 +46,7 @@ impl Configuration {
         self.proto_opts.get(protocol)?.get(network)
     }
 }
-pub fn get_enabled_protocol_network() -> HashMap<Protocol, Vec<Network>> {
+pub fn get_enabled_protocol_network() -> Option<HashMap<Protocol, Vec<Network>>> {
     let config = CONFIGURATION.get().unwrap();
     let mut res = HashMap::new();
     for (proto, networks) in &config.proto_opts {
@@ -56,7 +56,10 @@ pub fn get_enabled_protocol_network() -> HashMap<Protocol, Vec<Network>> {
         }
         res.insert(proto.clone().into(), net_names);
     }
-    res
+    if res.len() == 0 {
+        return None;
+    }
+    Some(res)
 }
 
 /**
