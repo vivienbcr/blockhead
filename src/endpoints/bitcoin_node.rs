@@ -1,7 +1,7 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
-
 use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
@@ -50,13 +50,8 @@ impl ProviderActions for BitcoinNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        // if !self.endpoint.available() {
-        //     return Err("Error: Endpoint not available".into());
-        // }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
-
         let bbh_res = self.get_best_block_hash().await;
-
         let best_block_hash = match bbh_res {
             Ok(hash) => hash,
             Err(e) => {
@@ -101,6 +96,12 @@ impl ProviderActions for BitcoinNode {
         blockchain.sort();
         let reqwest = self.endpoint.reqwest.as_mut().unwrap();
         reqwest.set_last_request();
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }

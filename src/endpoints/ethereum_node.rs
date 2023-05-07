@@ -1,6 +1,7 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
 use crate::conf::{self, Endpoint, EndpointOptions, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -50,6 +51,12 @@ impl ProviderActions for EthereumNode {
         blockchain.sort();
         let reqwest = self.endpoint.reqwest.as_mut().unwrap();
         reqwest.set_last_request();
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }

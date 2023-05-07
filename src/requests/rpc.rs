@@ -140,6 +140,7 @@ impl ReqwestClient {
             };
             let response = request.send().await;
             let time_duration = time_start.elapsed().as_millis();
+
             if response.is_err() {
                 debug!(
                     "rpc request {} error, retrying in {} seconds, tries {} on {} ",
@@ -150,6 +151,7 @@ impl ReqwestClient {
             }
             let response = response?;
             let status = response.status().as_u16();
+            debug!("POST {} {} {}ms", &url, status, time_duration);
             track_status_code(&url, "POST", status, protocol, network);
             if status != 200 {
                 error!(

@@ -5,6 +5,7 @@ use serde::Deserialize;
 use crate::{
     commons::blockchain::{self, Block},
     conf::{Endpoint, EndpointOptions, Network, Protocol},
+    prom::registry::set_blockchain_height_endpoint,
     requests::client::ReqwestClient,
 };
 
@@ -38,6 +39,12 @@ impl ProviderActions for Blockcypher {
         blockchain.sort();
         let reqwest = self.endpoint.reqwest.as_mut().unwrap();
         reqwest.set_last_request();
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }

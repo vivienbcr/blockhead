@@ -75,6 +75,7 @@ async fn main() -> std::io::Result<()> {
             .allow_any_origin()
             .send_wildcard()
             .allowed_methods(vec!["GET"])
+            .allow_any_header()
             .max_age(3600);
         App::new()
             .wrap(cors)
@@ -90,6 +91,7 @@ async fn main() -> std::io::Result<()> {
             .allow_any_origin()
             .send_wildcard()
             .allowed_methods(vec!["GET"])
+            .allow_any_header()
             .max_age(3600);
         App::new()
             .wrap(cors)

@@ -6,6 +6,7 @@ use super::ProviderActions;
 use crate::commons::blockchain;
 
 use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -78,6 +79,12 @@ impl ProviderActions for Tzkt {
         blockchain.sort();
         let reqwest = self.endpoint.reqwest.as_mut().unwrap();
         reqwest.set_last_request();
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }
