@@ -40,7 +40,7 @@ pub static BLOCKCHAIN_HEIGHT: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 pub static BLOCKCHAIN_HEIGHT_ENDPOINT: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "blockchain_heigh_endpoint",
+        "blockchain_height_endpoint",
         "Height of the blockchain per endpoint",
         &["endpoint", "proto", "network"]
     )
