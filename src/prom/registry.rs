@@ -103,11 +103,37 @@ pub fn set_blockchain_metrics(
 }
 
 fn get_base_url(url: &str) -> String {
-    url.split('/')
+    let base_url = url
+        .split('/')
         .nth(2)
         .unwrap_or("unknown")
         .split(':')
         .nth(0)
         .unwrap_or("unknown")
-        .to_string()
+        .to_string();
+    // if base_url split . len > 2 => take last 2
+    let mut base_url = base_url.split('.').collect::<Vec<&str>>();
+    if base_url.len() > 2 {
+        base_url = base_url[base_url.len() - 2..].to_vec();
+    }
+    base_url.join(".").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prom_get_base_url() {
+        assert_eq!(get_base_url("https://api.domain.tld"), "domain.tld");
+        assert_eq!(get_base_url("https://api.domain.tld:1234"), "domain.tld");
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234/somethings"),
+            "domain.tld"
+        );
+        assert_eq!(
+            get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
+            "domain.tld"
+        );
+    }
 }
