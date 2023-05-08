@@ -1,6 +1,7 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
 use crate::conf::{self, Endpoint, EndpointOptions, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -19,6 +20,14 @@ impl ProviderActions for EthereumNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        trace!(
+            "parse_top_blocks: n_block: {} previous_head: {:?}",
+            n_block,
+            previous_head
+        );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let head = self.get_block_by_number(None, false).await?.pop().unwrap();
 
@@ -48,8 +57,13 @@ impl ProviderActions for EthereumNode {
             });
         }
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }
@@ -58,7 +72,7 @@ impl EthereumNode {
     pub fn new(options: EndpointOptions, protocol: Protocol, network: Network) -> EthereumNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -106,24 +120,24 @@ impl EthereumNode {
                 JsonRpcReqBody::Single(body)
             }
         };
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
 
         let res = match req {
             JsonRpcReqBody::Single(_) => {
-                let rpc_res: JsonRpcResponse<EthBlock> = reqwest
+                let rpc_res: JsonRpcResponse<EthBlock> = client
                     .rpc(
                         &req,
-                        &conf::Protocol::Ethereum.to_string(),
+                        &self.endpoint.protocol.to_string(),
                         &self.endpoint.network.to_string(),
                     )
                     .await?;
                 Ok(vec![rpc_res.result.unwrap()])
             }
             JsonRpcReqBody::Batch(_) => {
-                let rpc_res: Vec<JsonRpcResponse<EthBlock>> = reqwest
+                let rpc_res: Vec<JsonRpcResponse<EthBlock>> = client
                     .rpc(
                         &req,
-                        &conf::Protocol::Ethereum.to_string(),
+                        &self.endpoint.protocol.to_string(),
                         &self.endpoint.network.to_string(),
                     )
                     .await?;

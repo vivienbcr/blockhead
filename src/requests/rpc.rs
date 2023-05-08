@@ -107,11 +107,6 @@ impl ReqwestClient {
         protocol: &str,
         network: &str,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.available() {
-            return Err(Box::new(RequestError::EndpointReachRateLimit(
-                self.config.url.clone().unwrap_or("UNSET_URL".to_string()),
-            )));
-        }
         let b = serde_json::to_string(&body);
         let b = match b {
             Ok(b) => b,
@@ -140,6 +135,7 @@ impl ReqwestClient {
             };
             let response = request.send().await;
             let time_duration = time_start.elapsed().as_millis();
+            self.set_last_request();
             if response.is_err() {
                 debug!(
                     "rpc request {} error, retrying in {} seconds, tries {} on {} ",
@@ -150,6 +146,7 @@ impl ReqwestClient {
             }
             let response = response?;
             let status = response.status().as_u16();
+            debug!("POST {} {} {}ms", &url, status, time_duration);
             track_status_code(&url, "POST", status, protocol, network);
             if status != 200 {
                 error!(
@@ -187,12 +184,6 @@ impl ReqwestClient {
         protocol: &str,
         network: &str,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        if !self.available() {
-            return Err(Box::new(RequestError::EndpointReachRateLimit(
-                self.config.url.clone().unwrap_or("UNSET_URL".to_string()),
-            )));
-        }
-
         let url = url.to_string();
         let mut c = 0;
         for i in 0..self.config.retry {
@@ -211,6 +202,7 @@ impl ReqwestClient {
             };
             trace!("{} {} request", &method, url);
             let response: Result<reqwest::Response, reqwest::Error> = request.send().await;
+            self.set_last_request();
             let time_duration = time_start.elapsed().as_millis();
             let response = match response {
                 Ok(response) => response,

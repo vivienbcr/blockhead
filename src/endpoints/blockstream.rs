@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     commons::blockchain,
     conf::{self, Endpoint, Protocol},
+    prom::registry::set_blockchain_height_endpoint,
     requests::client::ReqwestClient,
 };
 
@@ -18,9 +19,17 @@ pub struct Blockstream {
 impl ProviderActions for Blockstream {
     async fn parse_top_blocks(
         &mut self,
-        nb_blocks: u32,
+        n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        trace!(
+            "parse_top_blocks: n_block: {} previous_head: {:?}",
+            n_block,
+            previous_head
+        );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let tip = self.get_chain_tip().await?;
         if let Some(previous_head) = previous_head {
@@ -36,7 +45,7 @@ impl ProviderActions for Blockstream {
         let mut height = tip.height;
 
         let mut blocks = self.get_blocks_from_height(height).await?;
-        while blocks.len() > 0 && blockchain.blocks.len() < nb_blocks as usize {
+        while blocks.len() > 0 && blockchain.blocks.len() < n_block as usize {
             for block in blocks {
                 blockchain.blocks.push(blockchain::Block {
                     hash: block.id,
@@ -49,12 +58,16 @@ impl ProviderActions for Blockstream {
             blocks = self.get_blocks_from_height(height).await?;
         }
         blockchain.sort();
-        // remove blocks to return vec len = nb_blocks
-        if blockchain.blocks.len() > nb_blocks as usize {
-            blockchain.blocks.truncate(nb_blocks as usize);
+        // remove blocks to return vec len = n_block
+        if blockchain.blocks.len() > n_block as usize {
+            blockchain.blocks.truncate(n_block as usize);
         }
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }
@@ -67,7 +80,7 @@ impl Blockstream {
     ) -> Blockstream {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -79,7 +92,7 @@ impl Blockstream {
         height: u64,
     ) -> Result<Vec<Block>, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/{}", self.endpoint.url, height);
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: Vec<Block> = client
             .run_request(
                 reqwest::Method::GET,
@@ -94,7 +107,7 @@ impl Blockstream {
 
     async fn get_chain_tip(&mut self) -> Result<Block, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/blocks/tip", self.endpoint.url);
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: Vec<Block> = client
             .run_request(
                 reqwest::Method::GET,

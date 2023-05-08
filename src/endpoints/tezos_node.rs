@@ -8,6 +8,7 @@ use super::ProviderActions;
 use crate::commons::blockchain;
 
 use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -18,7 +19,7 @@ impl TezosNode {
     pub fn new(options: conf::EndpointOptions, protocol: Protocol, network: Network) -> TezosNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -44,7 +45,9 @@ impl ProviderActions for TezosNode {
             n_block,
             previous_head
         );
-
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let previous_head: String = previous_head.unwrap_or("".to_string());
 
         let head = self.get_block(None).await?;
@@ -84,8 +87,13 @@ impl ProviderActions for TezosNode {
         }
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }
@@ -103,7 +111,7 @@ impl TezosNode {
             self.endpoint.url,
             hash_or_height.unwrap_or("head")
         );
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: TezosBlock = client
             .run_request(
                 reqwest::Method::GET,

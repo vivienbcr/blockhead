@@ -6,7 +6,10 @@ use prometheus::Registry;
 
 use crate::conf::{Network, Protocol};
 
-use super::metrics::{self, BLOCKCHAIN_HEAD_TIMESTAMP, BLOCKCHAIN_HEAD_TXS, BLOCKCHAIN_HEIGHT};
+use super::metrics::{
+    self, BLOCKCHAIN_HEAD_TIMESTAMP, BLOCKCHAIN_HEAD_TXS, BLOCKCHAIN_HEIGHT,
+    BLOCKCHAIN_HEIGHT_ENDPOINT,
+};
 
 static REGISTRY: Lazy<Mutex<Registry>> = Lazy::new(|| Mutex::new(Registry::new()));
 //TODO: Monitor response time for each endpoint
@@ -14,9 +17,11 @@ pub fn register_custom_metrics() {
     let r = REGISTRY.lock().unwrap();
     r.register(Box::new(metrics::HTTP_REQUEST_CODE.clone()))
         .expect("collector can be registered");
-    r.register(Box::new(metrics::ENDPOINT_RESPONSE_TIME.clone()))
+    r.register(Box::new(metrics::HTTP_RESPONSE_TIME.clone()))
         .expect("collector can be registered");
     r.register(Box::new(metrics::BLOCKCHAIN_HEIGHT.clone()))
+        .expect("collector can be registered");
+    r.register(Box::new(metrics::BLOCKCHAIN_HEIGHT_ENDPOINT.clone()))
         .expect("collector can be registered");
     r.register(Box::new(metrics::BLOCKCHAIN_HEAD_TIMESTAMP.clone()))
         .expect("collector can be registered");
@@ -62,9 +67,21 @@ pub fn track_response_time(
         network,
         time as f64
     );
-    metrics::ENDPOINT_RESPONSE_TIME
+    metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[&base_domain, &method.to_string(), protocol, network])
         .observe(time as f64);
+}
+pub fn set_blockchain_height_endpoint(
+    url: &str,
+    protocol: &Protocol,
+    network: &Network,
+    height: u64,
+) {
+    // retain only https://domain.tld
+    let base_domain = get_base_url(url);
+    BLOCKCHAIN_HEIGHT_ENDPOINT
+        .with_label_values(&[&base_domain, &protocol.to_string(), &network.to_string()])
+        .set(height as i64);
 }
 
 pub fn set_blockchain_metrics(
@@ -86,11 +103,37 @@ pub fn set_blockchain_metrics(
 }
 
 fn get_base_url(url: &str) -> String {
-    url.split('/')
+    let base_url = url
+        .split('/')
         .nth(2)
         .unwrap_or("unknown")
         .split(':')
         .nth(0)
         .unwrap_or("unknown")
-        .to_string()
+        .to_string();
+    // if base_url split . len > 2 => take last 2
+    let mut base_url = base_url.split('.').collect::<Vec<&str>>();
+    if base_url.len() > 2 {
+        base_url = base_url[base_url.len() - 2..].to_vec();
+    }
+    base_url.join(".").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prom_get_base_url() {
+        assert_eq!(get_base_url("https://api.domain.tld"), "domain.tld");
+        assert_eq!(get_base_url("https://api.domain.tld:1234"), "domain.tld");
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234/somethings"),
+            "domain.tld"
+        );
+        assert_eq!(
+            get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
+            "domain.tld"
+        );
+    }
 }

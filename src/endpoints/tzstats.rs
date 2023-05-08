@@ -6,6 +6,7 @@ use super::ProviderActions;
 use crate::commons::blockchain::{self, Block};
 
 use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -17,7 +18,7 @@ impl TzStats {
     pub fn new(options: conf::EndpointOptions, protocol: Protocol, network: Network) -> TzStats {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -36,7 +37,7 @@ impl TzStats {
     ) -> Result<TzStatsBlock, Box<dyn std::error::Error + Send + Sync>> {
         let q = height.unwrap_or("head".to_string());
         let url = format!("{}/explorer/block/{}", self.endpoint.url, q);
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let head: TzStatsBlock = client
             .run_request(
                 reqwest::Method::GET,
@@ -61,6 +62,9 @@ impl ProviderActions for TzStats {
             n_block,
             previous_head
         );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let head = self.get_block(None).await?;
         let previous_head: String = previous_head.unwrap_or("".to_string());
         if previous_head == head.hash {
@@ -97,8 +101,13 @@ impl ProviderActions for TzStats {
             i += 1;
         }
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }

@@ -7,6 +7,7 @@ use super::ProviderActions;
 use crate::commons::blockchain;
 
 use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 
 #[derive(Serialize, Debug, Clone)]
@@ -18,7 +19,7 @@ impl Subscan {
     pub fn new(options: conf::EndpointOptions, protocol: Protocol, network: Network) -> Subscan {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -44,6 +45,9 @@ impl ProviderActions for Subscan {
             n_block,
             previous_head
         );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let previous_head = previous_head.unwrap_or("".to_string());
         let block_head = self.get_finalized_head().await;
         let block_head = match block_head {
@@ -73,8 +77,13 @@ impl ProviderActions for Subscan {
             blockchain.add_block(b);
         }
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }
@@ -84,13 +93,13 @@ impl Subscan {
     async fn get_finalized_head(
         &mut self,
     ) -> Result<SubscanBlock, Box<dyn std::error::Error + Send + Sync>> {
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let url = format!("{}/api/v2/scan/blocks", self.endpoint.url);
         let body = json!({
             "row": 10,
             "page": 0
         });
-        let res: SubscanBlocksRes = reqwest
+        let res: SubscanBlocksRes = client
             .run_request(
                 reqwest::Method::POST,
                 Some(body),
@@ -118,7 +127,7 @@ impl Subscan {
         breaking_hash: Option<String>,
     ) -> Result<Vec<SubscanBlock>, Box<dyn std::error::Error + Send + Sync>> {
         let breaking_hash = breaking_hash.unwrap_or("".to_string());
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let mut blocks: Vec<SubscanBlock> = Vec::new();
         let mut n_page = 0;
         let mut blocks_len = 0;
@@ -134,7 +143,7 @@ impl Subscan {
                 "row": row,
                 "page": n_page
             });
-            let res: SubscanBlocksRes = reqwest
+            let res: SubscanBlocksRes = client
                 .run_request(
                     reqwest::Method::POST,
                     Some(body),

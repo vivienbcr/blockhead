@@ -15,9 +15,9 @@ pub static HTTP_REQUEST_CODE: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("metric can be created")
 });
-pub static ENDPOINT_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "endpoint_response_time_ms",
+        "http_response_time_ms",
         "Time to get response from endpoint in ms",
         &["base_url", "method", "proto", "network"],
         vec![
@@ -35,6 +35,14 @@ pub static BLOCKCHAIN_HEIGHT: Lazy<IntGaugeVec> = Lazy::new(|| {
         "blockchain_height",
         "Height of the blockchain",
         &["proto", "network"]
+    )
+    .expect("metric can be created")
+});
+pub static BLOCKCHAIN_HEIGHT_ENDPOINT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "blockchain_height_endpoint",
+        "Height of the blockchain per endpoint",
+        &["endpoint", "proto", "network"]
     )
     .expect("metric can be created")
 });

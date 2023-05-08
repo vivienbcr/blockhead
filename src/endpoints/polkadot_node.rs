@@ -6,6 +6,7 @@ use super::ProviderActions;
 use crate::commons::blockchain;
 
 use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -25,7 +26,7 @@ impl PolkadotNode {
     ) -> PolkadotNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -51,6 +52,9 @@ impl ProviderActions for PolkadotNode {
             n_block,
             previous_head
         );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let previous_head = previous_head.unwrap_or("".to_string());
         let head_hash = self.get_finalized_head().await?;
 
@@ -87,8 +91,13 @@ impl ProviderActions for PolkadotNode {
             blockchain.add_block(b);
         }
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }
@@ -104,8 +113,8 @@ impl PolkadotNode {
             id: 1,
         };
         let req = JsonRpcReqBody::Single(req);
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        let res: JsonRpcResponse<String> = reqwest
+        let client = &mut self.endpoint.reqwest;
+        let res: JsonRpcResponse<String> = client
             .rpc(
                 &req,
                 &Protocol::Polkadot.to_string(),
@@ -136,8 +145,8 @@ impl PolkadotNode {
             batch.push(req);
         });
         let req = JsonRpcReqBody::Batch(batch);
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        let res: Vec<JsonRpcResponse<PolkadotBlockResponse>> = reqwest
+        let client = &mut self.endpoint.reqwest;
+        let res: Vec<JsonRpcResponse<PolkadotBlockResponse>> = client
             .rpc(
                 &req,
                 &Protocol::Polkadot.to_string(),

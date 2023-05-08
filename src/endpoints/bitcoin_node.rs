@@ -1,7 +1,7 @@
 use super::ProviderActions;
 use crate::commons::blockchain::{self};
-
 use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
@@ -23,7 +23,7 @@ impl BitcoinNode {
     ) -> BitcoinNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -50,13 +50,17 @@ impl ProviderActions for BitcoinNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        // if !self.endpoint.available() {
-        //     return Err("Error: Endpoint not available".into());
-        // }
+        trace!(
+            "parse_top_blocks: n_block: {} previous_head: {:?}",
+            n_block,
+            previous_head
+        );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
+
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
-
         let bbh_res = self.get_best_block_hash().await;
-
         let best_block_hash = match bbh_res {
             Ok(hash) => hash,
             Err(e) => {
@@ -99,8 +103,12 @@ impl ProviderActions for BitcoinNode {
             return Err("Error: build blockchain is less than n_block".into());
         }
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+        set_blockchain_height_endpoint(
+            &self.endpoint.url,
+            &self.endpoint.protocol,
+            &self.endpoint.network,
+            blockchain.height,
+        );
         Ok(blockchain)
     }
 }
@@ -116,7 +124,7 @@ impl BitcoinNode {
             method: "getbestblockhash".to_string(),
             params: vec![],
         });
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: JsonRpcResponse<String> = client
             .rpc(
                 &body,
@@ -140,7 +148,7 @@ impl BitcoinNode {
                 JsonRpcParams::Number(1),
             ],
         });
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: JsonRpcResponse<Getblock> = client
             .rpc(
                 &body,
@@ -211,7 +219,7 @@ mod test {
     use std::env;
 
     #[tokio::test]
-    async fn test_get_best_block_hash() {
+    async fn bitcoin_node_get_best_block_hash() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
         let mut bitcoin_node =
@@ -225,7 +233,7 @@ mod test {
         assert!(res.unwrap().len() > 0)
     }
     #[tokio::test]
-    async fn test_get_block() {
+    async fn bitcoin_node_get_block() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
         let mut bitcoin_node =
