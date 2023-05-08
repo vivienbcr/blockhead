@@ -25,7 +25,7 @@ impl TemplateNode {
     ) -> TemplateNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -51,12 +51,13 @@ impl ProviderActions for TemplateNode {
             n_block,
             previous_head
         );
-
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let previous_head = previous_head.unwrap_or("".to_string());
 
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+
         set_blockchain_height_endpoint(
             &self.endpoint.url,
             &self.endpoint.protocol,

@@ -654,7 +654,7 @@ impl Network {
 pub struct Endpoint {
     pub url: String,
     #[serde(skip)]
-    pub reqwest: Option<ReqwestClient>,
+    pub reqwest: ReqwestClient,
     #[serde(skip)]
     pub network: Network,
     #[serde(skip)]
@@ -677,7 +677,7 @@ impl Endpoint {
             url: url.to_string(),
             protocol: proto,
             network: net,
-            reqwest: Some(ReqwestClient::new(opt)),
+            reqwest: ReqwestClient::new(opt),
         }
     }
 }
@@ -973,7 +973,7 @@ mod test {
             "First Bitcoin mainnet rpc url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, config.global.endpoints.rate,
             "First Bitcoin mainnet rpc url should be set"
@@ -1006,7 +1006,7 @@ mod test {
         );
 
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, 15,
             "First Bitcoin mainnet rpc url should be set"
@@ -1035,7 +1035,7 @@ mod test {
             "Bitcoin mainnet blockstream url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, 16,
             "Bitcoin mainnet blockstream url should be set"
@@ -1060,7 +1060,7 @@ mod test {
             "Bitcoin mainnet blockcypher url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, 19,
             "Bitcoin mainnet blockcypher url should be set"
@@ -1100,7 +1100,7 @@ mod test {
             "First Ethereum mainnet rpc url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.retry, 22,
             "First Ethereum mainnet retry should be equal to 22"
@@ -1144,7 +1144,7 @@ mod test {
             "First Ethereum sepolia rpc url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.retry, 25,
             "First Ethereum sepolia retry should be equal to 25"
@@ -1259,7 +1259,7 @@ mod test {
                         true,
                         "Url should be one of the expected ones"
                     );
-                    let client = r.endpoint.reqwest.unwrap();
+                    let client = r.endpoint.reqwest;
 
                     assert_eq!(
                         client.config.retry, DEFAULT_ENDPOINT_RETRY,
