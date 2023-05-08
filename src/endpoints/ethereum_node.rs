@@ -20,6 +20,11 @@ impl ProviderActions for EthereumNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        error!(
+            "FOR PROTO {} NET {} ",
+            self.endpoint.protocol.to_string(),
+            self.endpoint.network.to_string()
+        );
         trace!(
             "parse_top_blocks: n_block: {} previous_head: {:?}",
             n_block,
@@ -125,21 +130,13 @@ impl EthereumNode {
         let res = match req {
             JsonRpcReqBody::Single(_) => {
                 let rpc_res: JsonRpcResponse<EthBlock> = client
-                    .rpc(
-                        &req,
-                        &self.endpoint.protocol.to_string(),
-                        &self.endpoint.network.to_string(),
-                    )
+                    .rpc(&req, &self.endpoint.protocol, &self.endpoint.network)
                     .await?;
                 Ok(vec![rpc_res.result.unwrap()])
             }
             JsonRpcReqBody::Batch(_) => {
                 let rpc_res: Vec<JsonRpcResponse<EthBlock>> = client
-                    .rpc(
-                        &req,
-                        &self.endpoint.protocol.to_string(),
-                        &self.endpoint.network.to_string(),
-                    )
+                    .rpc(&req, &self.endpoint.protocol, &self.endpoint.network)
                     .await?;
                 let contain_err = rpc_res.iter().any(|r| {
                     if r.error.is_some() || r.result.is_none() {

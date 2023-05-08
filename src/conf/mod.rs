@@ -618,6 +618,20 @@ impl Protocol {
         }
     }
 }
+impl std::fmt::Display for Protocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Protocol::Bitcoin => "bitcoin",
+            Protocol::Ethereum => "ethereum",
+            Protocol::Ewf => "ewf",
+            Protocol::Tezos => "tezos",
+            Protocol::Polkadot => "polkadot",
+            Protocol::Moonbeam => "moonbeam",
+            Protocol::None => "None",
+        };
+        write!(f, "{}", s)
+    }
+}
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq, Copy)]
 pub enum Network {
     #[serde(rename = "mainnet")]
@@ -662,6 +676,21 @@ impl Network {
             Network::Kusama => "kusama".to_string(),
             Network::Moonriver => "moonriver".to_string(),
         }
+    }
+}
+impl std::fmt::Display for Network {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Network::Mainnet => "mainnet",
+            Network::Testnet => "testnet",
+            Network::Goerli => "goerli",
+            Network::Sepolia => "sepolia",
+            Network::Volta => "volta",
+            Network::Ghostnet => "ghostnet",
+            Network::Kusama => "kusama",
+            Network::Moonriver => "moonriver",
+        };
+        write!(f, "{}", s)
     }
 }
 #[derive(Serialize, Debug, Clone)]

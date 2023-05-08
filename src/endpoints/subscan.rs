@@ -104,8 +104,8 @@ impl Subscan {
                 reqwest::Method::POST,
                 Some(body),
                 &url,
-                &self.endpoint.protocol.to_string(),
-                &self.endpoint.network.to_string(),
+                &self.endpoint.protocol,
+                &self.endpoint.network,
             )
             .await?;
         // get highest number of block with finalized = true
@@ -148,8 +148,8 @@ impl Subscan {
                     reqwest::Method::POST,
                     Some(body),
                     &url,
-                    &self.endpoint.protocol.to_string(),
-                    &self.endpoint.network.to_string(),
+                    &self.endpoint.protocol,
+                    &self.endpoint.network,
                 )
                 .await?;
             /*

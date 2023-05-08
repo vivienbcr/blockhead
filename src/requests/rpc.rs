@@ -1,7 +1,11 @@
 use std::str::FromStr;
 
 use super::client::ReqwestClient;
-use crate::{prom::registry::track_response_time, prom::registry::track_status_code};
+use crate::{
+    conf::{Network, Protocol},
+    prom::registry::track_response_time,
+    prom::registry::track_status_code,
+};
 use reqwest::{
     header::{HeaderMap, HeaderName},
     Client,
@@ -104,8 +108,8 @@ impl ReqwestClient {
     pub async fn rpc<T: DeserializeOwned>(
         &mut self,
         body: &JsonRpcReqBody,
-        protocol: &str,
-        network: &str,
+        protocol: &Protocol,
+        network: &Network,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
         let b = serde_json::to_string(&body);
         let b = match b {
@@ -147,7 +151,7 @@ impl ReqwestClient {
             let response = response?;
             let status = response.status().as_u16();
             debug!("POST {} {} {}ms", &url, status, time_duration);
-            track_status_code(&url, "POST", status, protocol, network);
+            track_status_code(&url, "POST", status, &protocol, &network);
             if status != 200 {
                 error!(
                     "rpc {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
@@ -160,8 +164,8 @@ impl ReqwestClient {
             track_response_time(
                 &url,
                 &reqwest::Method::POST,
-                protocol,
-                network,
+                &protocol,
+                &network,
                 time_duration,
             );
             let r: Result<T, Error> = serde_json::from_str(&txt);
@@ -181,8 +185,8 @@ impl ReqwestClient {
         method: reqwest::Method,
         body: Option<serde_json::Value>,
         url: &str,
-        protocol: &str,
-        network: &str,
+        protocol: &Protocol,
+        network: &Network,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
         let url = url.to_string();
         let mut c = 0;
@@ -282,8 +286,8 @@ mod tests {
                 reqwest::Method::GET,
                 None,
                 url,
-                "protocol",
-                "network",
+                &Protocol::Tezos,
+                &Network::Mainnet,
             )
             .await;
         assert!(res.is_ok());

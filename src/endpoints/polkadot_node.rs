@@ -115,11 +115,7 @@ impl PolkadotNode {
         let req = JsonRpcReqBody::Single(req);
         let client = &mut self.endpoint.reqwest;
         let res: JsonRpcResponse<String> = client
-            .rpc(
-                &req,
-                &Protocol::Polkadot.to_string(),
-                &self.endpoint.network.to_string(),
-            )
+            .rpc(&req, &self.endpoint.protocol, &self.endpoint.network)
             .await?;
         match res.result {
             Some(res) => Ok(res),
@@ -147,11 +143,7 @@ impl PolkadotNode {
         let req = JsonRpcReqBody::Batch(batch);
         let client = &mut self.endpoint.reqwest;
         let res: Vec<JsonRpcResponse<PolkadotBlockResponse>> = client
-            .rpc(
-                &req,
-                &Protocol::Polkadot.to_string(),
-                &self.endpoint.network.to_string(),
-            )
+            .rpc(&req, &self.endpoint.protocol, &self.endpoint.network)
             .await?;
         Ok(res.into_iter().filter_map(|f| f.result).collect())
     }

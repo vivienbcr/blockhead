@@ -117,8 +117,8 @@ impl TezosNode {
                 reqwest::Method::GET,
                 None,
                 &url,
-                &Protocol::Tezos.to_string(),
-                &self.endpoint.network.to_string(),
+                &self.endpoint.protocol,
+                &self.endpoint.network,
             )
             .await?;
 

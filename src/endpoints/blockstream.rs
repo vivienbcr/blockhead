@@ -98,8 +98,8 @@ impl Blockstream {
                 reqwest::Method::GET,
                 None,
                 &url,
-                &conf::Protocol::Bitcoin.to_string(),
-                &self.endpoint.network.to_string(),
+                &self.endpoint.protocol,
+                &self.endpoint.network,
             )
             .await?;
         Ok(res)
@@ -113,8 +113,8 @@ impl Blockstream {
                 reqwest::Method::GET,
                 None,
                 &url,
-                &conf::Protocol::Bitcoin.to_string(),
-                &self.endpoint.network.to_string(),
+                &self.endpoint.protocol,
+                &self.endpoint.network,
             )
             .await?;
         if res.len() == 0 {

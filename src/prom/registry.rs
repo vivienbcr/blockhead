@@ -28,14 +28,20 @@ pub fn register_custom_metrics() {
     r.register(Box::new(metrics::BLOCKCHAIN_HEAD_TXS.clone()))
         .expect("collector can be registered");
 }
-pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &str, network: &str) {
+pub fn track_status_code(
+    url: &str,
+    method: &str,
+    status_code: u16,
+    protocol: &Protocol,
+    network: &Network,
+) {
     trace!(
         "track status code {} {} {} {} {}",
         url,
         method,
         status_code,
-        protocol,
-        network
+        protocol.to_string(),
+        network.to_string()
     );
     // retain only https://domain.tld
     let base_domain = get_base_url(url);
@@ -44,8 +50,8 @@ pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &s
             &base_domain,
             &status_code.to_string(),
             method,
-            protocol,
-            network,
+            &protocol.to_string(),
+            &network.to_string(),
         ])
         .inc();
 }
@@ -53,8 +59,8 @@ pub fn track_status_code(url: &str, method: &str, status_code: u16, protocol: &s
 pub fn track_response_time(
     url: &str,
     method: &reqwest::Method,
-    protocol: &str,
-    network: &str,
+    protocol: &Protocol,
+    network: &Network,
     time: u128,
 ) {
     // retain only https://domain.tld
@@ -68,7 +74,12 @@ pub fn track_response_time(
         time as f64
     );
     metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[&base_domain, &method.to_string(), protocol, network])
+        .with_label_values(&[
+            &base_domain,
+            &method.to_string(),
+            &protocol.to_string(),
+            &network.to_string(),
+        ])
         .observe(time as f64);
 }
 pub fn set_blockchain_height_endpoint(
@@ -85,8 +96,8 @@ pub fn set_blockchain_height_endpoint(
 }
 
 pub fn set_blockchain_metrics(
-    protocol: Protocol,
-    network: Network,
+    protocol: &Protocol,
+    network: &Network,
     head_height: i64,
     head_time: i64,
     head_txs: i64,
