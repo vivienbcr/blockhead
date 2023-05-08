@@ -219,7 +219,7 @@ mod test {
     use std::env;
 
     #[tokio::test]
-    async fn test_get_best_block_hash() {
+    async fn bitcoin_node_get_best_block_hash() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
         let mut bitcoin_node =
@@ -233,7 +233,7 @@ mod test {
         assert!(res.unwrap().len() > 0)
     }
     #[tokio::test]
-    async fn test_get_block() {
+    async fn bitcoin_node_get_block() {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
         let mut bitcoin_node =

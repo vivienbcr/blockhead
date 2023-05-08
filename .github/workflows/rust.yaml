@@ -29,3 +29,4 @@ jobs:
           BITCOIN_NODE_URL: ${{ secrets.BITCOIN_NODE_URL }}
           TEZOS_NODE_URL: ${{ secrets.TEZOS_NODE_URL }}
           EWF_NODE_URL: ${{ secrets.EWF_NODE_URL }}
+          BLOCKCYPHER_URL: ${{ secrets.BLOCKCYPHER_URL }}
