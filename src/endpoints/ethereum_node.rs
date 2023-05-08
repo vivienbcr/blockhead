@@ -20,11 +20,6 @@ impl ProviderActions for EthereumNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
-        error!(
-            "FOR PROTO {} NET {} ",
-            self.endpoint.protocol.to_string(),
-            self.endpoint.network.to_string()
-        );
         trace!(
             "parse_top_blocks: n_block: {} previous_head: {:?}",
             n_block,
