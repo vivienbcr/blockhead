@@ -55,7 +55,7 @@ pub fn track_status_code(
         ])
         .inc();
 }
-//TODO: Use protocol enum and network enum
+
 pub fn track_response_time(
     url: &str,
     method: &reqwest::Method,
@@ -128,6 +128,26 @@ fn get_base_url(url: &str) -> String {
         base_url = base_url[base_url.len() - 2..].to_vec();
     }
     base_url.join(".").to_string()
+}
+
+fn get_endpoint_status_metric(url: &str, protocol: &Protocol, network: &Network) -> bool {
+    // retain only https://domain.tld
+    let base_domain = get_base_url(url);
+    let state = metrics::ENDPOINT_STATUS
+        .with_label_values(&[&base_domain, &protocol.to_string(), &network.to_string()])
+        .get();
+    state == 1
+}
+pub fn set_endpoint_status_metric(url: &str, protocol: &Protocol, network: &Network, state: bool) {
+    let m_state = get_endpoint_status_metric(url, protocol, network);
+    if m_state == state {
+        return;
+    }
+    let state = if state { 1 } else { 0 };
+    let base_domain = get_base_url(url);
+    metrics::ENDPOINT_STATUS
+        .with_label_values(&[&base_domain, &protocol.to_string(), &network.to_string()])
+        .set(state);
 }
 
 #[cfg(test)]

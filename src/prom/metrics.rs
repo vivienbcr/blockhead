@@ -9,15 +9,15 @@ use prometheus::{
  */
 pub static HTTP_REQUEST_CODE: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "http_request_code",
-        "http request returns code",
+        "blockhead_http_response_code",
+        "Http code counter returned by the endpoint",
         &["base_url", "status_code", "method", "proto", "network"]
     )
     .expect("metric can be created")
 });
 pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "http_response_time_ms",
+        "blockhead_http_response_time_ms",
         "Time to get response from endpoint in ms",
         &["base_url", "method", "proto", "network"],
         vec![
@@ -28,19 +28,30 @@ pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("metric can be created")
 });
 /**
+ * Endpoint status
+ */
+pub static ENDPOINT_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "blockhead_endpoint_status",
+        "Endpoint status (1 = up, 0 = down)",
+        &["base_url", "proto", "network"]
+    )
+    .expect("metric can be created")
+});
+/**
  * Global blockchain metrics
  */
 pub static BLOCKCHAIN_HEIGHT: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "blockchain_height",
-        "Height of the blockchain",
+        "blockhead_blockchain_height",
+        "Height of last block in the blockchain",
         &["proto", "network"]
     )
     .expect("metric can be created")
 });
 pub static BLOCKCHAIN_HEIGHT_ENDPOINT: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "blockchain_height_endpoint",
+        "blockhead_blockchain_height_endpoint",
         "Height of the blockchain per endpoint",
         &["endpoint", "proto", "network"]
     )
@@ -48,16 +59,16 @@ pub static BLOCKCHAIN_HEIGHT_ENDPOINT: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 pub static BLOCKCHAIN_HEAD_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "blockchain_head_timestamp",
-        "Timestamp of the last block",
+        "blockhead_blockchain_head_timestamp",
+        "Timestamp of the last block in the blockchain",
         &["proto", "network"]
     )
     .expect("metric can be created")
 });
 pub static BLOCKCHAIN_HEAD_TXS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "blockchain_head_txs",
-        "How many transactions are in the blockchain head",
+        "blockhead_blockchain_head_txs",
+        "Number of transactions in the last block in the blockchain",
         &["proto", "network"]
     )
     .expect("metric can be created")
