@@ -127,7 +127,7 @@ impl EthereumNode {
                 let rpc_res: JsonRpcResponse<EthBlock> = client
                     .rpc(
                         &req,
-                        &conf::Protocol::Ethereum.to_string(),
+                        &self.endpoint.protocol.to_string(),
                         &self.endpoint.network.to_string(),
                     )
                     .await?;
@@ -137,7 +137,7 @@ impl EthereumNode {
                 let rpc_res: Vec<JsonRpcResponse<EthBlock>> = client
                     .rpc(
                         &req,
-                        &conf::Protocol::Ethereum.to_string(),
+                        &self.endpoint.protocol.to_string(),
                         &self.endpoint.network.to_string(),
                     )
                     .await?;
