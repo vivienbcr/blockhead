@@ -20,9 +20,17 @@ pub struct Blockcypher {
 impl ProviderActions for Blockcypher {
     async fn parse_top_blocks(
         &mut self,
-        nb_blocks: u32,
+        n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        trace!(
+            "parse_top_blocks: n_block: {} previous_head: {:?}",
+            n_block,
+            previous_head
+        );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let chain_state = self.get_chain_height().await?;
         if let Some(previous_head) = previous_head {
             if previous_head == chain_state.hash {
@@ -34,11 +42,9 @@ impl ProviderActions for Blockcypher {
             }
         }
         let height = chain_state.height;
-        let blocks = self.get_blocks_from_height(height, nb_blocks).await?;
+        let blocks = self.get_blocks_from_height(height, n_block).await?;
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(Some(blocks));
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
         set_blockchain_height_endpoint(
             &self.endpoint.url,
             &self.endpoint.protocol,
@@ -53,7 +59,7 @@ impl Blockcypher {
     pub fn new(options: EndpointOptions, protocol: Protocol, network: Network) -> Blockcypher {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -71,7 +77,7 @@ impl Blockcypher {
     ) -> Result<HeightResponse, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get head blockcypher");
         let url = format!("{}", self.endpoint.url);
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: HeightResponse = client
             .run_request(
                 reqwest::Method::GET,
@@ -93,7 +99,7 @@ impl Blockcypher {
         let mut blocks = Vec::new();
         for i in 0..n_block {
             let url = format!("{}/blocks/{}", self.endpoint.url, height - i);
-            let client = self.endpoint.reqwest.as_mut().unwrap();
+            let client = &mut self.endpoint.reqwest;
             let res: BlockResponse = client
                 .run_request(
                     reqwest::Method::GET,

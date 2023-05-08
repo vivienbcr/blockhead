@@ -23,7 +23,7 @@ impl BitcoinNode {
     ) -> BitcoinNode {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -50,6 +50,15 @@ impl ProviderActions for BitcoinNode {
         n_block: u32,
         previous_head: Option<String>,
     ) -> Result<blockchain::Blockchain, Box<dyn std::error::Error + Send + Sync>> {
+        trace!(
+            "parse_top_blocks: n_block: {} previous_head: {:?}",
+            n_block,
+            previous_head
+        );
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
+
         let mut blockchain: blockchain::Blockchain = blockchain::Blockchain::new(None);
         let bbh_res = self.get_best_block_hash().await;
         let best_block_hash = match bbh_res {
@@ -94,8 +103,6 @@ impl ProviderActions for BitcoinNode {
             return Err("Error: build blockchain is less than n_block".into());
         }
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
         set_blockchain_height_endpoint(
             &self.endpoint.url,
             &self.endpoint.protocol,
@@ -117,7 +124,7 @@ impl BitcoinNode {
             method: "getbestblockhash".to_string(),
             params: vec![],
         });
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: JsonRpcResponse<String> = client
             .rpc(
                 &body,
@@ -141,7 +148,7 @@ impl BitcoinNode {
                 JsonRpcParams::Number(1),
             ],
         });
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: JsonRpcResponse<Getblock> = client
             .rpc(
                 &body,

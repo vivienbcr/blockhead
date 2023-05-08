@@ -18,7 +18,7 @@ impl Tzkt {
     pub fn new(options: conf::EndpointOptions, protocol: Protocol, network: Network) -> Tzkt {
         let endpoint = Endpoint {
             url: options.url.clone().unwrap(),
-            reqwest: Some(ReqwestClient::new(options)),
+            reqwest: ReqwestClient::new(options),
             protocol,
             network,
             last_request: 0,
@@ -44,7 +44,9 @@ impl ProviderActions for Tzkt {
             n_block,
             previous_head
         );
-
+        if !self.endpoint.reqwest.available() {
+            return Err("Endpoint is not available".into());
+        }
         let previous_head: String = previous_head.unwrap_or("".to_string());
 
         let head = self.get_head().await?;
@@ -77,8 +79,7 @@ impl ProviderActions for Tzkt {
             i += 1;
         }
         blockchain.sort();
-        let reqwest = self.endpoint.reqwest.as_mut().unwrap();
-        reqwest.set_last_request();
+
         set_blockchain_height_endpoint(
             &self.endpoint.url,
             &self.endpoint.protocol,
@@ -95,7 +96,7 @@ impl Tzkt {
             "{}/v1/blocks?sort.desc=level&select=level,hash&limit=1",
             self.endpoint.url,
         );
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: Vec<TzktHead> = client
             .run_request(
                 reqwest::Method::GET,
@@ -119,7 +120,7 @@ impl Tzkt {
             "{}/v1/blocks/{}?operations=true",
             self.endpoint.url, block_level
         );
-        let client = self.endpoint.reqwest.as_mut().unwrap();
+        let client = &mut self.endpoint.reqwest;
         let res: TzktBlockFull = client
             .run_request(
                 reqwest::Method::GET,

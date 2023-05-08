@@ -282,6 +282,7 @@ pub enum Provider {
     Tzkt(Tzkt),
     TzStats(TzStats),
     Subscan(Subscan),
+    MoonbeamNode(EthereumNode),
     None,
 }
 #[cfg(test)]
@@ -353,6 +354,9 @@ impl Provider {
                 Provider::PolkadotNode(PolkadotNode::new(endpoint_opt, Protocol::Polkadot, n))
             }
             "subscan" => Provider::Subscan(Subscan::new(endpoint_opt, Protocol::Polkadot, n)),
+            "moonbeam_node" => {
+                Provider::MoonbeamNode(EthereumNode::new(endpoint_opt, Protocol::Moonbeam, n))
+            }
             _ => Provider::None,
         }
     }
@@ -368,6 +372,7 @@ impl Provider {
             Provider::TzStats(provider) => Some(provider),
             Provider::PolkadotNode(provider) => Some(provider),
             Provider::Subscan(provider) => Some(provider),
+            Provider::MoonbeamNode(provider) => Some(provider),
             _ => None,
         }
     }
@@ -383,6 +388,7 @@ impl Provider {
             "tzstats" => true,
             "polkadot_node" => true,
             "subscan" => true,
+            "moonbeam_node" => true,
             _ => false,
         }
     }
@@ -582,6 +588,8 @@ pub enum Protocol {
     Tezos,
     #[serde(rename = "polkadot")]
     Polkadot,
+    #[serde(rename = "moonbeam")]
+    Moonbeam,
     #[serde(rename = "None")]
     None,
 }
@@ -594,6 +602,7 @@ impl Protocol {
             "ewf" => Some(Protocol::Ewf),
             "tezos" => Some(Protocol::Tezos),
             "polkadot" => Some(Protocol::Polkadot),
+            "moonbeam" => Some(Protocol::Moonbeam),
             _ => None,
         }
     }
@@ -604,6 +613,7 @@ impl Protocol {
             Protocol::Ewf => "ewf".to_string(),
             Protocol::Tezos => "tezos".to_string(),
             Protocol::Polkadot => "polkadot".to_string(),
+            Protocol::Moonbeam => "moonbeam".to_string(),
             Protocol::None => "None".to_string(),
         }
     }
@@ -624,6 +634,8 @@ pub enum Network {
     Ghostnet,
     #[serde(rename = "kusama")]
     Kusama,
+    #[serde(rename = "moonriver")]
+    Moonriver,
 }
 impl Network {
     fn from(s: String) -> Option<Self> {
@@ -635,6 +647,7 @@ impl Network {
             "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
             "kusama" => Some(Network::Kusama),
+            "moonriver" => Some(Network::Moonriver),
             _ => None,
         }
     }
@@ -647,6 +660,7 @@ impl Network {
             Network::Volta => "volta".to_string(),
             Network::Ghostnet => "ghostnet".to_string(),
             Network::Kusama => "kusama".to_string(),
+            Network::Moonriver => "moonriver".to_string(),
         }
     }
 }
@@ -654,7 +668,7 @@ impl Network {
 pub struct Endpoint {
     pub url: String,
     #[serde(skip)]
-    pub reqwest: Option<ReqwestClient>,
+    pub reqwest: ReqwestClient,
     #[serde(skip)]
     pub network: Network,
     #[serde(skip)]
@@ -677,7 +691,7 @@ impl Endpoint {
             url: url.to_string(),
             protocol: proto,
             network: net,
-            reqwest: Some(ReqwestClient::new(opt)),
+            reqwest: ReqwestClient::new(opt),
         }
     }
 }
@@ -973,7 +987,7 @@ mod test {
             "First Bitcoin mainnet rpc url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, config.global.endpoints.rate,
             "First Bitcoin mainnet rpc url should be set"
@@ -1006,7 +1020,7 @@ mod test {
         );
 
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, 15,
             "First Bitcoin mainnet rpc url should be set"
@@ -1035,7 +1049,7 @@ mod test {
             "Bitcoin mainnet blockstream url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, 16,
             "Bitcoin mainnet blockstream url should be set"
@@ -1060,7 +1074,7 @@ mod test {
             "Bitcoin mainnet blockcypher url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.rate, 19,
             "Bitcoin mainnet blockcypher url should be set"
@@ -1100,7 +1114,7 @@ mod test {
             "First Ethereum mainnet rpc url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.retry, 22,
             "First Ethereum mainnet retry should be equal to 22"
@@ -1144,7 +1158,7 @@ mod test {
             "First Ethereum sepolia rpc url should be set"
         );
         let e = b.unwrap().endpoint.clone();
-        let e = e.reqwest.unwrap();
+        let e = e.reqwest;
         assert_eq!(
             e.config.retry, 25,
             "First Ethereum sepolia retry should be equal to 25"
@@ -1259,7 +1273,7 @@ mod test {
                         true,
                         "Url should be one of the expected ones"
                     );
-                    let client = r.endpoint.reqwest.unwrap();
+                    let client = r.endpoint.reqwest;
 
                     assert_eq!(
                         client.config.retry, DEFAULT_ENDPOINT_RETRY,
