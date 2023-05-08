@@ -126,11 +126,7 @@ impl BitcoinNode {
         });
         let client = &mut self.endpoint.reqwest;
         let res: JsonRpcResponse<String> = client
-            .rpc(
-                &body,
-                &conf::Protocol::Bitcoin.to_string(),
-                &self.endpoint.network.to_string(),
-            )
+            .rpc(&body, &self.endpoint.protocol, &self.endpoint.network)
             .await?;
         Ok(res.result.unwrap())
     }
@@ -150,11 +146,7 @@ impl BitcoinNode {
         });
         let client = &mut self.endpoint.reqwest;
         let res: JsonRpcResponse<Getblock> = client
-            .rpc(
-                &body,
-                &conf::Protocol::Bitcoin.to_string(),
-                &self.endpoint.network.to_string(),
-            )
+            .rpc(&body, &self.endpoint.protocol, &self.endpoint.network)
             .await?;
         Ok(res.result.unwrap())
     }

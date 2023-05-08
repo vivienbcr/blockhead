@@ -83,8 +83,8 @@ impl Blockcypher {
                 reqwest::Method::GET,
                 None,
                 &url,
-                &Protocol::Bitcoin.to_string(),
-                &self.endpoint.network.to_string(),
+                &self.endpoint.protocol,
+                &self.endpoint.network,
             )
             .await?;
         Ok(res)
@@ -105,8 +105,8 @@ impl Blockcypher {
                     reqwest::Method::GET,
                     None,
                     &url,
-                    &Protocol::Bitcoin.to_string(),
-                    &self.endpoint.network.to_string(),
+                    &self.endpoint.protocol,
+                    &self.endpoint.network,
                 )
                 .await?;
 

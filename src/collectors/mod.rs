@@ -61,8 +61,8 @@ pub async fn runner(
         best_chain.sort();
         debug!("best_chain: {:?}", &best_chain);
         prom::registry::set_blockchain_metrics(
-            protocol,
-            network,
+            &protocol,
+            &network,
             best_chain.height as i64,
             best_chain.blocks.last().unwrap().time as i64,
             best_chain.blocks.last().unwrap().txs as i64,
