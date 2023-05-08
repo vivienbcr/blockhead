@@ -28,12 +28,23 @@ pub static HTTP_RESPONSE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("metric can be created")
 });
 /**
+ * Endpoint status
+ */
+pub static ENDPOINT_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "endpoint_status",
+        "Endpoint status (1 = up, 0 = down)",
+        &["base_url", "proto", "network"]
+    )
+    .expect("metric can be created")
+});
+/**
  * Global blockchain metrics
  */
 pub static BLOCKCHAIN_HEIGHT: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "blockchain_height",
-        "Height of the blockchain",
+        "Height of last block in the blockchain",
         &["proto", "network"]
     )
     .expect("metric can be created")
@@ -49,7 +60,7 @@ pub static BLOCKCHAIN_HEIGHT_ENDPOINT: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static BLOCKCHAIN_HEAD_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "blockchain_head_timestamp",
-        "Timestamp of the last block",
+        "Timestamp of the last block in the blockchain",
         &["proto", "network"]
     )
     .expect("metric can be created")
@@ -57,7 +68,7 @@ pub static BLOCKCHAIN_HEAD_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static BLOCKCHAIN_HEAD_TXS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "blockchain_head_txs",
-        "How many transactions are in the blockchain head",
+        "Number of transactions in the last block in the blockchain",
         &["proto", "network"]
     )
     .expect("metric can be created")

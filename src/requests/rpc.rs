@@ -3,8 +3,8 @@ use std::str::FromStr;
 use super::client::ReqwestClient;
 use crate::{
     conf::{Network, Protocol},
-    prom::registry::track_response_time,
     prom::registry::track_status_code,
+    prom::registry::{set_endpoint_status_metric, track_response_time},
 };
 use reqwest::{
     header::{HeaderMap, HeaderName},
@@ -141,7 +141,7 @@ impl ReqwestClient {
             let time_duration = time_start.elapsed().as_millis();
             self.set_last_request();
             if response.is_err() {
-                debug!(
+                error!(
                     "rpc request {} error, retrying in {} seconds, tries {} on {} ",
                     &b, self.config.delay, i, self.config.retry
                 );
@@ -161,6 +161,7 @@ impl ReqwestClient {
                 continue;
             }
             let txt = response.text().await?;
+            set_endpoint_status_metric(&url, &protocol, &network, true);
             track_response_time(
                 &url,
                 &reqwest::Method::POST,
@@ -177,6 +178,8 @@ impl ReqwestClient {
                 }
             }
         }
+        // After all retry, set endpoint down and return error
+        set_endpoint_status_metric(&url, &protocol, &network, false);
         return Err(format!("rpc {} fail after {} retry", &url, &c).into());
     }
 
