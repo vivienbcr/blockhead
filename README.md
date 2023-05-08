@@ -2,6 +2,32 @@
 
 Blockhead is simple application used to parse blockchains head state and monitor responses from multiple sources. Blockhead expose results via HTTP API and Prometheus metrics.
 
+## Supported blockchains / providers
+
+- Bitcoin
+  - Native API (node)
+  - Blockstream
+  - Blockcypher
+- Ethereum
+  - Native API (node)
+- Tezos
+  - Native API (node)
+  - Tzkt
+  - Tzstats
+- Ewf
+  - Native API (node)
+- Polkadot
+  - Native API (node)
+  - Subscan
+- Moonbeam
+  - Native API (node)
+
+## Features
+
+- Custom header
+- Basic Http auth
+- Custom rate limit / retry / delay between requests
+
 ## Usage
 
 ### Create config file
@@ -43,10 +69,16 @@ protocols:
             delay: 1
             rate: 1
         - url: https://sample2.bitcoin.mainnet.rpc
+          options:
+            basic-auth:
+              username: user
+              password: pass
       blockstream:
         url: https://blockstream.info/api
       blockcypher:
         url: https://api.blockcypher.com
+          headers:
+            X-API-Key: 1234567890
     testnet: ...
   ethereum:
     mainnet:
@@ -101,3 +133,15 @@ cargo run -- --config config.yaml
 
 - API endpoints on : http://localhost:8080/
 - Prometheus metrics on : http://localhost:8081/metrics
+
+## Prometheus metrics
+
+Available metrics :
+
+- blockhead_http_response_code (gauge) : Http code returned by endpoints
+- blockhead_http_response_time_ms (histogram) : Http response time in ms
+- blockhead_endpoint_status (gauge) : Endpoint status (1 = ok, 0 = ko)
+- blockhead_blockchain_height (gauge) : Computed blockchain height
+- blockhead_blockchain_head_timestamp (gauge) : Computed blockchain head timestamp
+- blockhead_blockchain_head_txs (gauge) : Computed blockchain head txs
+- blockhead_blockchain_height_endpoint (gauge) : Endpoint blockchain height
