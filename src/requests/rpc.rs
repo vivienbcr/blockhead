@@ -139,7 +139,7 @@ impl ReqwestClient {
             if response.is_err() {
                 debug!(
                     "rpc request {} error, retrying in {} seconds, tries {} on {} ",
-                    &b, self.config.rate, i, self.config.retry
+                    &b, self.config.delay, i, self.config.retry
                 );
                 self.iddle().await;
                 continue;
@@ -151,7 +151,7 @@ impl ReqwestClient {
             if status != 200 {
                 error!(
                     "rpc {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
-                    url, status, self.config.rate, i, self.config.retry, &b
+                    url, status, self.config.delay, i, self.config.retry, &b
                 );
                 self.iddle().await;
                 continue;
@@ -209,7 +209,7 @@ impl ReqwestClient {
                 Err(e) => {
                     error!(
                         "Error: {} {} request error, retrying in {} seconds, tries {} on {} : {} ",
-                        &method, url, self.config.rate, i, self.config.retry, e
+                        &method, url, self.config.delay, i, self.config.retry, e
                     );
                     self.iddle().await;
                     continue;
@@ -221,7 +221,7 @@ impl ReqwestClient {
             if status != 200 {
                 error!(
                     "{} {} status code {}, retrying in {} seconds, tries {} on {} ",
-                    &method, url, status, self.config.rate, i, self.config.retry
+                    &method, url, status, self.config.delay, i, self.config.retry
                 );
                 self.iddle().await;
                 continue;
@@ -233,7 +233,7 @@ impl ReqwestClient {
                 Err(e) => {
                     error!(
                         "{} {} response error: {}, retrying in {} seconds, tries {} on {} ",
-                        &method, url, e, self.config.rate, i, self.config.retry
+                        &method, url, e, self.config.delay, i, self.config.retry
                     );
                     self.iddle().await;
                     continue;
@@ -245,7 +245,7 @@ impl ReqwestClient {
                 Err(e) => {
                     debug!(
                         "{} {} response decode error: {}, retrying in {} seconds, tries {} on {}\nraw: {} ",
-                        &method, url, e, self.config.rate, i, self.config.retry, &r_txt
+                        &method, url, e, self.config.delay, i, self.config.retry, &r_txt
                     );
                     self.iddle().await;
                     continue;

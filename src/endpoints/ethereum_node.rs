@@ -172,46 +172,35 @@ impl EthereumNode {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct EthBlock {
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
-    #[serde(rename = "baseFeePerGas")]
     pub base_fee_per_gas: u64,
     #[serde(deserialize_with = "deserialize_from_hex_to_u128")]
     pub difficulty: u128,
-    #[serde(rename = "extraData")]
     pub extra_data: String,
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
-    #[serde(rename = "gasLimit")]
     pub gas_limit: u64,
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
-    #[serde(rename = "gasUsed")]
     pub gas_used: u64,
     pub hash: String,
-    #[serde(rename = "logsBloom")]
     pub logs_bloom: String,
     pub miner: String,
-    #[serde(rename = "mixHash")]
     pub mix_hash: Option<String>, // Options to deal with Forks
-    pub nonce: Option<String>, // Options to deal with Forks
+    pub nonce: Option<String>,    // Options to deal with Forks
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     pub number: u64,
-    #[serde(rename = "parentHash")]
     pub parent_hash: String,
-    #[serde(rename = "receiptsRoot")]
     pub receipts_root: String,
-    #[serde(rename = "sha3Uncles")]
     pub sha3_uncles: String,
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     pub size: u64,
-    #[serde(rename = "stateRoot")]
     pub state_root: String,
     #[serde(deserialize_with = "deserialize_from_hex_to_u64")]
     pub timestamp: u64,
     //TODO: Some Eth forks use totalDifficulty > u128, we need use big number crate to support it
     // while we don't need to use it now, so just use String
-    #[serde(rename = "totalDifficulty")]
     pub total_difficulty: String,
-    #[serde(rename = "transactionsRoot")]
     pub transactions_root: String,
     pub uncles: Vec<String>,
     pub transactions: Vec<String>,
