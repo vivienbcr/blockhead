@@ -282,6 +282,7 @@ pub enum Provider {
     Tzkt(Tzkt),
     TzStats(TzStats),
     Subscan(Subscan),
+    MoonbeamNode(EthereumNode),
     None,
 }
 #[cfg(test)]
@@ -353,6 +354,9 @@ impl Provider {
                 Provider::PolkadotNode(PolkadotNode::new(endpoint_opt, Protocol::Polkadot, n))
             }
             "subscan" => Provider::Subscan(Subscan::new(endpoint_opt, Protocol::Polkadot, n)),
+            "moonbeam_node" => {
+                Provider::MoonbeamNode(EthereumNode::new(endpoint_opt, Protocol::Moonbeam, n))
+            }
             _ => Provider::None,
         }
     }
@@ -368,6 +372,7 @@ impl Provider {
             Provider::TzStats(provider) => Some(provider),
             Provider::PolkadotNode(provider) => Some(provider),
             Provider::Subscan(provider) => Some(provider),
+            Provider::MoonbeamNode(provider) => Some(provider),
             _ => None,
         }
     }
@@ -383,6 +388,7 @@ impl Provider {
             "tzstats" => true,
             "polkadot_node" => true,
             "subscan" => true,
+            "moonbeam_node" => true,
             _ => false,
         }
     }
@@ -582,6 +588,8 @@ pub enum Protocol {
     Tezos,
     #[serde(rename = "polkadot")]
     Polkadot,
+    #[serde(rename = "moonbeam")]
+    Moonbeam,
     #[serde(rename = "None")]
     None,
 }
@@ -594,6 +602,7 @@ impl Protocol {
             "ewf" => Some(Protocol::Ewf),
             "tezos" => Some(Protocol::Tezos),
             "polkadot" => Some(Protocol::Polkadot),
+            "moonbeam" => Some(Protocol::Moonbeam),
             _ => None,
         }
     }
@@ -604,6 +613,7 @@ impl Protocol {
             Protocol::Ewf => "ewf".to_string(),
             Protocol::Tezos => "tezos".to_string(),
             Protocol::Polkadot => "polkadot".to_string(),
+            Protocol::Moonbeam => "moonbeam".to_string(),
             Protocol::None => "None".to_string(),
         }
     }
@@ -624,6 +634,8 @@ pub enum Network {
     Ghostnet,
     #[serde(rename = "kusama")]
     Kusama,
+    #[serde(rename = "moonriver")]
+    Moonriver,
 }
 impl Network {
     fn from(s: String) -> Option<Self> {
@@ -635,6 +647,7 @@ impl Network {
             "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
             "kusama" => Some(Network::Kusama),
+            "moonriver" => Some(Network::Moonriver),
             _ => None,
         }
     }
@@ -647,6 +660,7 @@ impl Network {
             Network::Volta => "volta".to_string(),
             Network::Ghostnet => "ghostnet".to_string(),
             Network::Kusama => "kusama".to_string(),
+            Network::Moonriver => "moonriver".to_string(),
         }
     }
 }
