@@ -1,8 +1,8 @@
 use crate::{
     endpoints::{
         bitcoin_node::BitcoinNode, blockcypher::Blockcypher, blockstream::Blockstream,
-        ethereum_node::EthereumNode, polkadot_node::PolkadotNode, subscan::Subscan,
-        tezos_node::TezosNode, tzkt::Tzkt, tzstats::TzStats, ProviderActions,
+        ethereum_node::EthereumNode, polkadot_node::PolkadotNode, starknet_node::StarknetNode,
+        subscan::Subscan, tezos_node::TezosNode, tzkt::Tzkt, tzstats::TzStats, ProviderActions,
     },
     requests::client::ReqwestClient,
 };
@@ -283,6 +283,7 @@ pub enum Provider {
     TzStats(TzStats),
     Subscan(Subscan),
     MoonbeamNode(EthereumNode),
+    StarknetNode(StarknetNode),
     None,
 }
 #[cfg(test)]
@@ -357,6 +358,9 @@ impl Provider {
             "moonbeam_node" => {
                 Provider::MoonbeamNode(EthereumNode::new(endpoint_opt, Protocol::Moonbeam, n))
             }
+            "starknet_node" => {
+                Provider::StarknetNode(StarknetNode::new(endpoint_opt, Protocol::Starknet, n))
+            }
             _ => Provider::None,
         }
     }
@@ -373,6 +377,7 @@ impl Provider {
             Provider::PolkadotNode(provider) => Some(provider),
             Provider::Subscan(provider) => Some(provider),
             Provider::MoonbeamNode(provider) => Some(provider),
+            Provider::StarknetNode(provider) => Some(provider),
             _ => None,
         }
     }
@@ -389,6 +394,7 @@ impl Provider {
             "polkadot_node" => true,
             "subscan" => true,
             "moonbeam_node" => true,
+            "starknet_node" => true,
             _ => false,
         }
     }
@@ -590,6 +596,8 @@ pub enum Protocol {
     Polkadot,
     #[serde(rename = "moonbeam")]
     Moonbeam,
+    #[serde(rename = "starknet")]
+    Starknet,
     #[serde(rename = "None")]
     None,
 }
@@ -603,6 +611,7 @@ impl Protocol {
             "tezos" => Some(Protocol::Tezos),
             "polkadot" => Some(Protocol::Polkadot),
             "moonbeam" => Some(Protocol::Moonbeam),
+            "starknet" => Some(Protocol::Starknet),
             _ => None,
         }
     }
@@ -614,6 +623,7 @@ impl Protocol {
             Protocol::Tezos => "tezos".to_string(),
             Protocol::Polkadot => "polkadot".to_string(),
             Protocol::Moonbeam => "moonbeam".to_string(),
+            Protocol::Starknet => "starknet".to_string(),
             Protocol::None => "None".to_string(),
         }
     }
@@ -627,6 +637,7 @@ impl std::fmt::Display for Protocol {
             Protocol::Tezos => "tezos",
             Protocol::Polkadot => "polkadot",
             Protocol::Moonbeam => "moonbeam",
+            Protocol::Starknet => "starknet",
             Protocol::None => "None",
         };
         write!(f, "{}", s)
@@ -650,6 +661,8 @@ pub enum Network {
     Kusama,
     #[serde(rename = "moonriver")]
     Moonriver,
+    #[serde(rename = "testnet2")]
+    Testnet2,
 }
 impl Network {
     fn from(s: String) -> Option<Self> {
@@ -675,6 +688,7 @@ impl Network {
             Network::Ghostnet => "ghostnet".to_string(),
             Network::Kusama => "kusama".to_string(),
             Network::Moonriver => "moonriver".to_string(),
+            Network::Testnet2 => "testnet2".to_string(),
         }
     }
 }
@@ -689,6 +703,7 @@ impl std::fmt::Display for Network {
             Network::Ghostnet => "ghostnet",
             Network::Kusama => "kusama",
             Network::Moonriver => "moonriver",
+            Network::Testnet2 => "testnet2",
         };
         write!(f, "{}", s)
     }

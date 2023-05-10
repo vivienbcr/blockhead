@@ -5,6 +5,7 @@ pub mod blockcypher;
 pub mod blockstream;
 pub mod ethereum_node;
 pub mod polkadot_node;
+pub mod starknet_node;
 pub mod subscan;
 pub mod tezos_node;
 pub mod tzkt;
