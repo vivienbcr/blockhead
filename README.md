@@ -21,6 +21,8 @@ Blockhead is simple application used to parse blockchains head state and monitor
   - Subscan
 - Moonbeam
   - Native API (node)
+- Starknet
+  - Native API (node)
 
 ## Features
 
