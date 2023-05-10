@@ -675,6 +675,7 @@ impl Network {
             "ghostnet" => Some(Network::Ghostnet),
             "kusama" => Some(Network::Kusama),
             "moonriver" => Some(Network::Moonriver),
+            "testnet2" => Some(Network::Testnet2),
             _ => None,
         }
     }
