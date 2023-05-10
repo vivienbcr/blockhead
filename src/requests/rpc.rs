@@ -25,6 +25,7 @@ pub enum JsonRpcParams {
     String(String),
     Number(u32),
     Bool(bool),
+    SerdeValue(serde_json::Value),
 }
 impl Serialize for JsonRpcParams {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -35,6 +36,7 @@ impl Serialize for JsonRpcParams {
             JsonRpcParams::String(s) => serializer.serialize_str(s),
             JsonRpcParams::Number(n) => serializer.serialize_u32(*n),
             JsonRpcParams::Bool(b) => serializer.serialize_bool(*b),
+            JsonRpcParams::SerdeValue(v) => v.serialize(serializer),
         }
     }
 }

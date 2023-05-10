@@ -30,3 +30,4 @@ jobs:
           TEZOS_NODE_URL: ${{ secrets.TEZOS_NODE_URL }}
           EWF_NODE_URL: ${{ secrets.EWF_NODE_URL }}
           BLOCKCYPHER_URL: ${{ secrets.BLOCKCYPHER_URL }}
+          STARKNET_NODE_URL: ${{ secrets.STARKNET_NODE_URL }}
