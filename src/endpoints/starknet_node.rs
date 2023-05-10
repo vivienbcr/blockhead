@@ -182,8 +182,6 @@ mod tests {
 
     use super::*;
     use crate::tests;
-    use crate::utils;
-    use hex;
 
     #[tokio::test]
     async fn starknet_get_head() {
