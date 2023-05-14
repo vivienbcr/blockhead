@@ -4,25 +4,21 @@ Blockhead is simple application used to parse blockchains head state and monitor
 
 ## Supported blockchains / providers
 
-- Bitcoin
-  - Native API (node)
-  - Blockstream
-  - Blockcypher
-- Ethereum
-  - Native API (node)
-- Tezos
-  - Native API (node)
-  - Tzkt
-  - Tzstats
-- Ewf
-  - Native API (node)
-- Polkadot
-  - Native API (node)
-  - Subscan
-- Moonbeam
-  - Native API (node)
-- Starknet
-  - Native API (node)
+| Blockchain | Network | Endpoint                                                                           | Notes                                                                                                  |
+| ---------- | ------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Bitcoin    | Mainnet | [RPC](https://developer.bitcoin.org/reference/rpc/)                                |                                                                                                        |
+|            |         | [Blockstream](https://github.com/Blockstream/esplora/blob/master/API.md)           |                                                                                                        |
+|            |         | [Blockcypher](https://www.blockcypher.com/dev/bitcoin/#introduction)               | Tune rate limit to don't reach [429 Errors](https://developer.mozilla.org/fr/docs/Web/HTTP/Status/429) |
+| Ethereum   | Mainnet | [RPC](https://ethereum.org/en/developers/docs/apis/json-rpc/)                      |                                                                                                        |
+| Tezos      | Mainnet | [RPC](https://tezos.gitlab.io/active/rpc.html)                                     |                                                                                                        |
+|            |         | [Tzkt](https://api.tzkt.io/)                                                       |                                                                                                        |
+|            |         | [Tzstats](https://tzstats.com/docs/api#tezos-api)                                  |                                                                                                        |
+| Ewf        | Mainnet | [RPC](https://github.com/energywebfoundation/ewf-rpc)                              |                                                                                                        |
+| Polkadot   | Mainnet | [RPC](https://polkadot.js.org/docs/substrate/rpc/)                                 |                                                                                                        |
+|            |         | [Subscan](https://support.subscan.io)                                              |                                                                                                        |
+| Moonbeam   | Mainnet | [RPC](https://docs.moonbeam.network/builders/get-started/eth-compare/rpc-support/) |                                                                                                        |
+| Starknet   | Mainnet | [RPC](https://github.com/starkware-libs/starknet-specs)                            |                                                                                                        |
+| Avalanche  | Mainnet | [RPC](https://docs.avax.network/apis/avalanchego/apis/c-chain)                     | For https://api.avax.network/ext/bc/C/rpc use https://api.avax.network                                 |
 
 ## Features
 
