@@ -284,6 +284,7 @@ pub enum Provider {
     Subscan(Subscan),
     MoonbeamNode(EthereumNode),
     StarknetNode(StarknetNode),
+    AvalancheNode(EthereumNode),
     None,
 }
 #[cfg(test)]
@@ -361,6 +362,13 @@ impl Provider {
             "starknet_node" => {
                 Provider::StarknetNode(StarknetNode::new(endpoint_opt, Protocol::Starknet, n))
             }
+            "avalanche_node" => {
+                let endpoint_opt = EndpointOptions {
+                    url: Some(format!("{}{}", endpoint_opt.url.unwrap(), "/ext/bc/C/rpc")),
+                    ..endpoint_opt
+                };
+                Provider::AvalancheNode(EthereumNode::new(endpoint_opt, Protocol::Avalanche, n))
+            }
             _ => Provider::None,
         }
     }
@@ -378,6 +386,7 @@ impl Provider {
             Provider::Subscan(provider) => Some(provider),
             Provider::MoonbeamNode(provider) => Some(provider),
             Provider::StarknetNode(provider) => Some(provider),
+            Provider::AvalancheNode(provider) => Some(provider),
             _ => None,
         }
     }
@@ -395,6 +404,7 @@ impl Provider {
             "subscan" => true,
             "moonbeam_node" => true,
             "starknet_node" => true,
+            "avalanche_node" => true,
             _ => false,
         }
     }
@@ -598,6 +608,8 @@ pub enum Protocol {
     Moonbeam,
     #[serde(rename = "starknet")]
     Starknet,
+    #[serde(rename = "avalanche")]
+    Avalanche,
     #[serde(rename = "None")]
     None,
 }
@@ -612,6 +624,7 @@ impl Protocol {
             "polkadot" => Some(Protocol::Polkadot),
             "moonbeam" => Some(Protocol::Moonbeam),
             "starknet" => Some(Protocol::Starknet),
+            "avalanche" => Some(Protocol::Avalanche),
             _ => None,
         }
     }
@@ -624,6 +637,7 @@ impl Protocol {
             Protocol::Polkadot => "polkadot".to_string(),
             Protocol::Moonbeam => "moonbeam".to_string(),
             Protocol::Starknet => "starknet".to_string(),
+            Protocol::Avalanche => "avalanche".to_string(),
             Protocol::None => "None".to_string(),
         }
     }
@@ -638,6 +652,7 @@ impl std::fmt::Display for Protocol {
             Protocol::Polkadot => "polkadot",
             Protocol::Moonbeam => "moonbeam",
             Protocol::Starknet => "starknet",
+            Protocol::Avalanche => "avalanche",
             Protocol::None => "None",
         };
         write!(f, "{}", s)
@@ -663,6 +678,8 @@ pub enum Network {
     Moonriver,
     #[serde(rename = "testnet2")]
     Testnet2,
+    #[serde(rename = "fuji")]
+    Fuji,
 }
 impl Network {
     fn from(s: String) -> Option<Self> {
@@ -676,6 +693,7 @@ impl Network {
             "kusama" => Some(Network::Kusama),
             "moonriver" => Some(Network::Moonriver),
             "testnet2" => Some(Network::Testnet2),
+            "fuji" => Some(Network::Fuji),
             _ => None,
         }
     }
@@ -690,6 +708,7 @@ impl Network {
             Network::Kusama => "kusama".to_string(),
             Network::Moonriver => "moonriver".to_string(),
             Network::Testnet2 => "testnet2".to_string(),
+            Network::Fuji => "fuji".to_string(),
         }
     }
 }
@@ -705,6 +724,7 @@ impl std::fmt::Display for Network {
             Network::Kusama => "kusama",
             Network::Moonriver => "moonriver",
             Network::Testnet2 => "testnet2",
+            Network::Fuji => "fuji",
         };
         write!(f, "{}", s)
     }
