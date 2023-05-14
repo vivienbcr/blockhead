@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use super::ProviderActions;
 use crate::commons::blockchain;
 
-use crate::conf::{self, Endpoint, EndpointActions, Network, Protocol};
+use crate::conf::{self, Endpoint, Network, Protocol};
+use crate::prom::registry::set_blockchain_height_endpoint;
 use crate::requests::client::ReqwestClient;
 use crate::requests::rpc::{
     JsonRpcParams, JsonRpcReq, JsonRpcReqBody, JsonRpcResponse, JSON_RPC_VER,
@@ -55,6 +56,8 @@ impl ProviderActions for TemplateNode {
             return Err("Endpoint is not available".into());
         }
         let previous_head = previous_head.unwrap_or("".to_string());
+
+        let blockchain = blockchain::Blockchain::new(None);
 
         blockchain.sort();
 
