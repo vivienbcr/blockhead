@@ -365,7 +365,7 @@ impl Provider {
             "avalanche_node" => {
                 let endpoint_opt = EndpointOptions {
                     url: Some(format!("{}{}", endpoint_opt.url.unwrap(), "/ext/bc/C/rpc")),
-                    ..Default::default()
+                    ..endpoint_opt
                 };
                 Provider::AvalancheNode(EthereumNode::new(endpoint_opt, Protocol::Avalanche, n))
             }
