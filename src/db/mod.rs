@@ -7,7 +7,7 @@ use std::io;
 
 use crate::{
     commons::blockchain::{self, Block},
-    conf::{self, Network, Protocol, CONFIGURATION},
+    conf::{self, get_configuration, Network, Protocol},
 };
 const TABLE: TableDefinition<&str, &str> = TableDefinition::new("blockchain");
 pub static DATABASE: OnceCell<Redb> = OnceCell::new();
@@ -128,7 +128,7 @@ impl Redb {
             chain_db.height, blockchain.height
         );
 
-        let keep = CONFIGURATION.get().unwrap().database.keep_history;
+        let keep = get_configuration().unwrap().database.keep_history;
 
         let mut merged_blocks: Vec<Block> = chain_db
             .blocks
