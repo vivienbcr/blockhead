@@ -57,6 +57,11 @@ impl ProviderActions for Subscan {
                 return Err(e);
             }
         };
+        trace!(
+            "Head hash {} height {}",
+            block_head.hash,
+            block_head.block_num
+        );
         /*
          * Get the head block to check if there is a new block
          */
@@ -69,7 +74,7 @@ impl ProviderActions for Subscan {
         }
         let mut blockchain = blockchain::Blockchain::new(None);
         let res = self
-            .get_finalized_blocks(n_block as u16, Some(previous_head))
+            .get_finalized_blocks(n_block as u16, Some(block_head.hash))
             .await?;
 
         for block in res {
@@ -120,59 +125,98 @@ impl Subscan {
             None => Err("No head".into()),
         }
     }
+    async fn get_block(
+        &mut self,
+        height: u64,
+    ) -> Result<SubscanBlock, Box<dyn std::error::Error + Send + Sync>> {
+        let client = &mut self.endpoint.reqwest;
+        let url = format!("{}/api/v2/scan/block", self.endpoint.url);
+        let body = json!({
+            "block_num": height,
+        });
+        let res: SubscanBlock = client
+            .run_request(
+                reqwest::Method::POST,
+                Some(body),
+                &url,
+                &self.endpoint.protocol,
+                &self.endpoint.network,
+            )
+            .await?;
+        Ok(res)
+    }
 
     async fn get_finalized_blocks(
         &mut self,
         n_block: u16,
-        breaking_hash: Option<String>,
+        from_hash: Option<String>,
     ) -> Result<Vec<SubscanBlock>, Box<dyn std::error::Error + Send + Sync>> {
-        let breaking_hash = breaking_hash.unwrap_or("".to_string());
+        // let from_hash = from_hash.unwrap_or("".to_string());
+        trace!(
+            "get_finalized_blocks: n_block: {}, hash : {:?}",
+            n_block,
+            from_hash,
+        );
         let client = &mut self.endpoint.reqwest;
-        let mut blocks: Vec<SubscanBlock> = Vec::new();
-        let mut n_page = 0;
-        let mut blocks_len = 0;
-        while blocks_len < n_block as usize {
-            let row = if n_block - blocks.len() as u16 > PAGE_MAX_ROW {
-                PAGE_MAX_ROW
-            } else {
-                // Head block are not finalized, search away from 10 blocks
-                n_block + 10 - blocks.len() as u16
-            };
-            let url = format!("{}/api/v2/scan/blocks", self.endpoint.url);
-            let body = json!({
-                "row": row,
-                "page": n_page
-            });
-            let res: SubscanBlocksRes = client
-                .run_request(
-                    reqwest::Method::POST,
-                    Some(body),
-                    &url,
-                    &self.endpoint.protocol,
-                    &self.endpoint.network,
-                )
-                .await?;
-            /*
-             * append blocks until we find the breaking condition
-             */
-            trace!(
-                "Search head hash {} == {}",
-                res.data.blocks[0].hash,
-                breaking_hash
-            );
-            for bb in res.data.blocks.iter() {
-                if !&bb.finalized || blocks.iter().any(|b| b.block_num == bb.block_num) {
-                    continue;
-                }
-                blocks.push(bb.clone());
-                blocks_len += 1;
-                // if we find the breaking condition, stop
-                if bb.hash == breaking_hash || blocks_len >= n_block as usize {
-                    blocks_len = n_block as usize;
+        let query_len = if PAGE_MAX_ROW < n_block + 30 {
+            PAGE_MAX_ROW
+        } else {
+            n_block + 30
+        };
+        let url = format!("{}/api/v2/scan/blocks", self.endpoint.url);
+        let body = json!({
+            "row": query_len,
+            "page": 0
+        });
+        let res: SubscanBlocksRes = client
+            .run_request(
+                reqwest::Method::POST,
+                Some(body),
+                &url,
+                &self.endpoint.protocol,
+                &self.endpoint.network,
+            )
+            .await?;
+        let mut finalized_blocks: Vec<SubscanBlock> = res
+            .data
+            .blocks
+            .iter()
+            .filter(|b| b.finalized)
+            .cloned()
+            .collect();
+        finalized_blocks.sort_by(|a, b| b.block_num.cmp(&a.block_num));
+        let mut blocks = vec![];
+        // from hash is none, we take just last blocks finalized from the last block
+        let mut found = if from_hash.is_none() { true } else { false };
+        let from_hash = from_hash.unwrap_or("".to_string());
+        // find the block with the same hash as the previous head
+        for block in finalized_blocks {
+            if found {
+                blocks.push(block.clone());
+                if blocks.len() >= n_block as usize {
                     break;
                 }
+                continue;
             }
-            n_page += 1;
+            if block.hash == from_hash {
+                found = true;
+                blocks.push(block.clone());
+                continue;
+            }
+        }
+        if !found {
+            error!("Block {} not found", from_hash);
+            return Err("Block not found".into());
+        }
+
+        // if we didn't find all requested blocks, get blocks one by one to complete list
+        if blocks.len() < n_block as usize {
+            let mut height = blocks.last().unwrap().block_num;
+            while blocks.len() < n_block as usize {
+                height -= 1;
+                let block = self.get_block(height).await?;
+                blocks.push(block.clone());
+            }
         }
         Ok(blocks)
     }
@@ -243,8 +287,8 @@ mod tests {
         if blockchain.is_ok() {
             let blockchain = blockchain.unwrap();
             assert!(
-                blockchain.blocks.len() < 40,
-                "Subscan should return less blocks than requested, {} expected, {} returned",
+                blockchain.blocks.len() == 40,
+                "Subscan should n block as expected, {} expected, {} returned",
                 40,
                 blockchain.blocks.len()
             );
