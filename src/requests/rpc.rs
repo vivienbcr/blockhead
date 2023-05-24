@@ -87,6 +87,9 @@ impl std::fmt::Display for RequestError {
 impl std::error::Error for RequestError {}
 
 impl ReqwestClient {
+    fn get_timout(&self) -> tokio::time::Duration {
+        tokio::time::Duration::from_secs(self.config.timeout as u64)
+    }
     fn get_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         match &self.config.headers {
@@ -99,12 +102,28 @@ impl ReqwestClient {
                             continue;
                         }
                     };
-                    headers.insert(key, v.parse().unwrap());
+                    match v.parse() {
+                        Ok(v) => {
+                            headers.insert(key, v);
+                        }
+                        Err(e) => {
+                            error!("Error parsing header value: {}", e);
+                            continue;
+                        }
+                    };
                 }
             }
             None => {}
         }
-        headers.insert("Content-Type", "application/json".parse().unwrap());
+        match "application/json".parse() {
+            Ok(v) => {
+                headers.insert("Content-Type", v);
+            }
+            Err(e) => {
+                error!("Error parsing header value: {}", e);
+            }
+        }
+
         headers
     }
     pub async fn rpc<T: DeserializeOwned>(
@@ -130,11 +149,15 @@ impl ReqwestClient {
         };
         let mut c = 0;
         for i in 0..self.config.retry {
-            c += i;
+            c += i; // count for logger
             let time_start = std::time::Instant::now();
             let client = Client::new();
             let headers = self.get_headers();
-            let request = client.post(&url).body(b.clone()).headers(headers);
+            let request = client
+                .post(&url)
+                .body(b.clone())
+                .headers(headers)
+                .timeout(self.get_timout());
             let request = match self.config.basic_auth.clone() {
                 Some(auth) => request.basic_auth(auth.username, Some(auth.password)),
                 None => request,
@@ -142,15 +165,21 @@ impl ReqwestClient {
             let response = request.send().await;
             let time_duration = time_start.elapsed().as_millis();
             self.set_last_request();
-            if response.is_err() {
-                error!(
-                    "rpc request {} error, retrying in {} seconds, tries {} on {} ",
-                    &b, self.config.delay, i, self.config.retry
-                );
-                self.iddle().await;
-                continue;
-            }
-            let response = response?;
+            let response = match response {
+                Ok(response) => response,
+                Err(e) => {
+                    error!(
+                        "rpc {} request {} return error code {:?} source: {}, retrying in {} seconds, tries {} on {} ",
+                        &url, &b,e.status(),e.to_string(),  self.config.delay, i, self.config.retry
+                    );
+                    if e.is_timeout() {
+                        return Err(Box::new(e));
+                    }
+                    self.iddle().await;
+                    continue;
+                }
+            };
+
             let status = response.status().as_u16();
             debug!("POST {} {} {}ms", &url, status, time_duration);
             track_status_code(&url, "POST", status, &protocol, &network);
@@ -200,7 +229,10 @@ impl ReqwestClient {
             let time_start = std::time::Instant::now();
             let client = Client::new();
             let headers = self.get_headers();
-            let request = client.request(method.clone(), &url).headers(headers);
+            let request = client
+                .request(method.clone(), &url)
+                .headers(headers)
+                .timeout(self.get_timout());
             let request = match self.config.basic_auth.clone() {
                 Some(auth) => request.basic_auth(auth.username, Some(auth.password)),
                 None => request,

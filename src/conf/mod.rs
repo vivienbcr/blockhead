@@ -9,14 +9,20 @@ use crate::{
 
 use clap::{Parser, ValueEnum};
 use config::{self, ConfigError, File};
+use std::{
+    io,
+    sync::{PoisonError, RwLock},
+};
+use tokio::sync::mpsc;
 
 use env_logger::Env;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, ffi::OsString, path::PathBuf};
 
-pub static CONFIGURATION: OnceCell<Configuration> = OnceCell::new();
+pub static CONFIGURATION: Lazy<RwLock<Option<Configuration>>> = Lazy::new(|| RwLock::new(None));
+pub static CONFIGURATION_PATH: OnceCell<PathBuf> = OnceCell::new();
 
 type NetworkProvider = HashMap<Network, Vec<Provider>>;
 type NetworkOptions = HashMap<Network, NetworkAppOptions>;
@@ -46,8 +52,33 @@ impl Configuration {
         self.proto_opts.get(protocol)?.get(network)
     }
 }
+pub fn get_configuration() -> Option<Configuration> {
+    let config = CONFIGURATION.read();
+    // if lock error
+    let r = match config {
+        Ok(c) => c.clone(),
+        Err(e) => panic!("Error while getting configuration: {}", e),
+    };
+    r
+}
+pub fn set_configuration(
+    conf: Option<Configuration>,
+) -> Result<(), PoisonError<std::sync::RwLockWriteGuard<'static, Option<Configuration>>>> {
+    let config: Result<
+        std::sync::RwLockWriteGuard<Option<Configuration>>,
+        PoisonError<std::sync::RwLockWriteGuard<Option<Configuration>>>,
+    > = CONFIGURATION.write();
+    match config {
+        Ok(mut c) => {
+            *c = conf;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
 pub fn get_enabled_protocol_network() -> Option<HashMap<Protocol, Vec<Network>>> {
-    let config = CONFIGURATION.get().unwrap();
+    let config = get_configuration().unwrap(); // FIXME
     let mut res = HashMap::new();
     for (proto, networks) in &config.proto_opts {
         let mut net_names = Vec::new();
@@ -523,19 +554,22 @@ pub struct EndpointOptions {
     pub delay: u32,
     #[serde(default = "default_endpoint_request_rate")]
     pub rate: u32,
+    #[serde(default = "default_endpoint_request_timeout")]
+    pub timeout: u32,
     pub headers: Option<HashMap<String, String>>,
     pub basic_auth: Option<BasicAuth>,
 }
 impl Default for EndpointOptions {
     fn default() -> Self {
-        let global = CONFIGURATION.get();
+        let global = get_configuration();
         match global {
             Some(g) => g.global.endpoints.clone(),
             None => EndpointOptions {
                 url: None,
-                retry: DEFAULT_ENDPOINT_RETRY,
-                delay: DEFAULT_ENDPOINT_DELAY,
-                rate: DEFAULT_ENDPOINT_REQUEST_RATE,
+                retry: default_endpoint_retry(),
+                delay: default_endpoint_delay(),
+                rate: default_endpoint_request_rate(),
+                timeout: default_endpoint_request_timeout(),
                 headers: None,
                 basic_auth: None,
             },
@@ -586,8 +620,9 @@ impl EndpointOptions {
             retry: 10,
             delay: 1,
             rate: 0,
-            headers: headers,
-            basic_auth: basic_auth,
+            timeout: default_endpoint_request_timeout(),
+            headers,
+            basic_auth,
         }
     }
 }
@@ -828,10 +863,15 @@ pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
 fn default_endpoint_request_rate() -> u32 {
     DEFAULT_ENDPOINT_REQUEST_RATE
 }
+pub const DEFAULT_ENDPOINT_REQUEST_TIMEOUT: u32 = 10;
+fn default_endpoint_request_timeout() -> u32 {
+    DEFAULT_ENDPOINT_REQUEST_TIMEOUT
+}
 pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
 fn default_database_keep_history() -> u32 {
     DEFAULT_DATABASE_KEEP_HISTORY
 }
+
 pub const DEFAULT_CONFIG_PATH: &str = "config.yaml";
 
 pub const DEFAULT_DATABASE_PATH: &str = "blockhead.db";
@@ -851,10 +891,14 @@ impl Configuration {
             Some(args) => Args::parse_from(args),
             None => Args::parse(),
         };
-        let conf_path = match file {
+        let conf_path: PathBuf = match file {
             Some(path) => PathBuf::from(path),
             None => args.config.unwrap_or(PathBuf::from(DEFAULT_CONFIG_PATH)),
         };
+        // Configuration path is set only once
+        if CONFIGURATION_PATH.get().is_none() && init {
+            CONFIGURATION_PATH.set(conf_path.clone()).unwrap();
+        }
 
         let builder = config::Config::builder()
             .set_default("global.server.port", DEFAULT_SERVER_PORT)?
@@ -878,9 +922,9 @@ impl Configuration {
             None => {}
         };
         if init {
-            // Set config as global
-            CONFIGURATION.set(config.clone()).unwrap();
+            set_configuration(Some(config.clone())).unwrap();
         }
+
         Ok(config)
     }
 }
@@ -897,6 +941,56 @@ pub fn init_logger(args: Option<Vec<OsString>>) {
 
     let env = Env::default().default_filter_or(format!("blockhead={}", log_level.to_string()));
     env_logger::init_from_env(env);
+}
+
+use futures::{
+    channel::mpsc::{channel, Receiver},
+    SinkExt, StreamExt,
+};
+use notify::{
+    event::{AccessKind, AccessMode},
+    Event, RecommendedWatcher, RecursiveMode, Watcher,
+};
+
+fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
+    let (mut tx, rx) = channel(1);
+
+    // Automatically select the best implementation for your platform.
+    // You can also access each implementation directly e.g. INotifyWatcher.
+    let watcher = notify::recommended_watcher(move |res| {
+        futures::executor::block_on(async {
+            tx.send(res).await.unwrap();
+        })
+    })?;
+
+    Ok((watcher, rx))
+}
+
+pub async fn watch_configuration_change(tx: mpsc::Sender<bool>) -> Result<(), io::Error> {
+    let (mut watcher, mut rx) = async_watcher().unwrap();
+
+    let path = CONFIGURATION_PATH.get().unwrap();
+    watcher.watch(path, RecursiveMode::NonRecursive).unwrap();
+
+    while let Some(res) = rx.next().await {
+        match res {
+            Ok(event) => {
+                println!("raw event: {:?}", event);
+                match event {
+                    Event {
+                        kind: notify::event::EventKind::Access(AccessKind::Close(AccessMode::Write)),
+                        ..
+                    } => {
+                        Configuration::new(None, None, true).unwrap();
+                        tx.send(true).await.unwrap();
+                    }
+                    _ => continue,
+                }
+            }
+            Err(e) => println!("watch error: {:?}", e),
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
