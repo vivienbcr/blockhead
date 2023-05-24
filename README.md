@@ -25,6 +25,7 @@ Blockhead is simple application used to parse blockchains head state and monitor
 - Custom header
 - Basic Http auth
 - Custom rate limit / retry / delay between requests
+- Config file hot reload
 
 ## Usage
 
