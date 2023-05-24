@@ -523,6 +523,8 @@ pub struct EndpointOptions {
     pub delay: u32,
     #[serde(default = "default_endpoint_request_rate")]
     pub rate: u32,
+    #[serde(default = "default_endpoint_request_timeout")]
+    pub timeout: u32,
     pub headers: Option<HashMap<String, String>>,
     pub basic_auth: Option<BasicAuth>,
 }
@@ -533,9 +535,10 @@ impl Default for EndpointOptions {
             Some(g) => g.global.endpoints.clone(),
             None => EndpointOptions {
                 url: None,
-                retry: DEFAULT_ENDPOINT_RETRY,
-                delay: DEFAULT_ENDPOINT_DELAY,
-                rate: DEFAULT_ENDPOINT_REQUEST_RATE,
+                retry: default_endpoint_retry(),
+                delay: default_endpoint_delay(),
+                rate: default_endpoint_request_rate(),
+                timeout: default_endpoint_request_timeout(),
                 headers: None,
                 basic_auth: None,
             },
@@ -586,8 +589,9 @@ impl EndpointOptions {
             retry: 10,
             delay: 1,
             rate: 0,
-            headers: headers,
-            basic_auth: basic_auth,
+            timeout: default_endpoint_request_timeout(),
+            headers,
+            basic_auth,
         }
     }
 }
@@ -828,10 +832,15 @@ pub const DEFAULT_ENDPOINT_REQUEST_RATE: u32 = 5;
 fn default_endpoint_request_rate() -> u32 {
     DEFAULT_ENDPOINT_REQUEST_RATE
 }
+pub const DEFAULT_ENDPOINT_REQUEST_TIMEOUT: u32 = 10;
+fn default_endpoint_request_timeout() -> u32 {
+    DEFAULT_ENDPOINT_REQUEST_TIMEOUT
+}
 pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
 fn default_database_keep_history() -> u32 {
     DEFAULT_DATABASE_KEEP_HISTORY
 }
+
 pub const DEFAULT_CONFIG_PATH: &str = "config.yaml";
 
 pub const DEFAULT_DATABASE_PATH: &str = "blockhead.db";
