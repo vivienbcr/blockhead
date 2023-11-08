@@ -1,9 +1,8 @@
+use super::ProviderActions;
+use crate::commons::blockchain::{self, Block};
 use async_trait::async_trait;
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
-
-use super::ProviderActions;
-use crate::commons::blockchain::{self, Block};
 
 use crate::conf::{self, Endpoint, Network, Protocol};
 use crate::prom::registry::set_blockchain_height_endpoint;
@@ -26,9 +25,14 @@ impl TzStats {
         TzStats { endpoint }
     }
     #[cfg(test)]
-    pub fn test_new(url: &str, proto: Protocol, net: Network) -> Self {
+    pub fn test_new(url: &str, proto: Protocol, net: Network, api_key: &str) -> Self {
+        use std::collections::HashMap;
+
+        let api_key_headers: Option<std::collections::HashMap<String, String>> = Some(
+            HashMap::from([("X-API-KEY".to_string(), api_key.to_string())]),
+        );
         TzStats {
-            endpoint: conf::Endpoint::test_new(url, proto, net, None, None),
+            endpoint: conf::Endpoint::test_new(url, proto, net, api_key_headers, None),
         }
     }
     async fn get_block(
@@ -164,13 +168,16 @@ struct TzStatsBlock {
 mod tests {
 
     extern crate env_logger;
+    use std::env;
+
     use super::*;
     use crate::tests;
     #[tokio::test]
     async fn tzstats_parse_top_blocks() {
         tests::setup();
-        let url = "https://api.ghost.tzstats.com";
-        let mut tzstats = TzStats::test_new(url, Protocol::Tezos, Network::Ghostnet);
+        let api_key = env::var("TZSTATS_API_KEY").unwrap();
+        let url = "https://api.ghost.tzpro.io";
+        let mut tzstats = TzStats::test_new(url, Protocol::Tezos, Network::Ghostnet, &api_key);
         let blockchain = tzstats
             .parse_top_blocks(5, None)
             .await
