@@ -6,19 +6,19 @@ Blockhead is simple application used to parse blockchains head state and monitor
 
 | Blockchain | Network | Endpoint                                                                           | Notes                                                                                                  |
 | ---------- | ------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Bitcoin    | Mainnet | [RPC](https://developer.bitcoin.org/reference/rpc/)                                |                                                                                                        |
+| Bitcoin    | Mainnet, Testnet | [RPC](https://developer.bitcoin.org/reference/rpc/)                                |                                                                                                        |
 |            |         | [Blockstream](https://github.com/Blockstream/esplora/blob/master/API.md)           |                                                                                                        |
 |            |         | [Blockcypher](https://www.blockcypher.com/dev/bitcoin/#introduction)               | Tune rate limit to don't reach [429 Errors](https://developer.mozilla.org/fr/docs/Web/HTTP/Status/429) |
-| Ethereum   | Mainnet | [RPC](https://ethereum.org/en/developers/docs/apis/json-rpc/)                      |                                                                                                        |
-| Tezos      | Mainnet | [RPC](https://tezos.gitlab.io/active/rpc.html)                                     |                                                                                                        |
+| Ethereum   | Mainnet, Goerli, Sepolia | [RPC](https://ethereum.org/en/developers/docs/apis/json-rpc/)                      |                                                                                                        |
+| Tezos      | Mainnet, Ghostnet | [RPC](https://tezos.gitlab.io/active/rpc.html)                                     |                                                                                                        |
 |            |         | [Tzkt](https://api.tzkt.io/)                                                       |                                                                                                        |
 |            |         | [Tzstats](https://tzstats.com/docs/api#tezos-api)                                  |                                                                                                        |
-| Ewf        | Mainnet | [RPC](https://github.com/energywebfoundation/ewf-rpc)                              |                                                                                                        |
-| Polkadot   | Mainnet | [RPC](https://polkadot.js.org/docs/substrate/rpc/)                                 |                                                                                                        |
+| Ewf        | Mainnet, Volta | [RPC](https://github.com/energywebfoundation/ewf-rpc)                              |                                                                                                        |
+| Polkadot   | Mainnet, Westend, Kusama | [RPC](https://polkadot.js.org/docs/substrate/rpc/)                                 |                                                                                                        |
 |            |         | [Subscan](https://support.subscan.io)                                              |                                                                                                        |
-| Moonbeam   | Mainnet | [RPC](https://docs.moonbeam.network/builders/get-started/eth-compare/rpc-support/) |                                                                                                        |
-| Starknet   | Mainnet | [RPC](https://github.com/starkware-libs/starknet-specs)                            |                                                                                                        |
-| Avalanche  | Mainnet | [RPC](https://docs.avax.network/apis/avalanchego/apis/c-chain)                     | For https://api.avax.network/ext/bc/C/rpc use https://api.avax.network                                 |
+| Moonbeam   | Mainnet, Moonriver | [RPC](https://docs.moonbeam.network/builders/get-started/eth-compare/rpc-support/) |                                                                                                        |
+| Starknet   | Mainnet, Testnet2 | [RPC](https://github.com/starkware-libs/starknet-specs)                            |                                                                                                        |
+| Avalanche  | Mainnet, Fuji | [RPC](https://docs.avax.network/apis/avalanchego/apis/c-chain)                     | For https://api.avax.network/ext/bc/C/rpc use https://api.avax.network                                 |
 
 ## Features
 
@@ -77,7 +77,7 @@ protocols:
       blockcypher:
         url: https://api.blockcypher.com
           headers:
-            X-API-Key: 1234567890
+            X-API-Key: MySuperSecretKey
     testnet: ...
   ethereum:
     mainnet:
@@ -93,6 +93,9 @@ protocols:
         url: https://api.tzkt.io
       tzstats:
         url: https://api.tzstats.com
+        options:
+          headers:
+            X-API-KEY: MySuperSecretKey
     ghostnet: ...
 ```
 

@@ -31,3 +31,4 @@ jobs:
           EWF_NODE_URL: ${{ secrets.EWF_NODE_URL }}
           BLOCKCYPHER_URL: ${{ secrets.BLOCKCYPHER_URL }}
           STARKNET_NODE_URL: ${{ secrets.STARKNET_NODE_URL }}
+          TZSTATS_API_KEY: ${{ secrets.TZSTATS_API_KEY }}

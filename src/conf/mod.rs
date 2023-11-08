@@ -709,6 +709,8 @@ pub enum Network {
     Ghostnet,
     #[serde(rename = "kusama")]
     Kusama,
+    #[serde(rename = "westend")]
+    Westend,
     #[serde(rename = "moonriver")]
     Moonriver,
     #[serde(rename = "testnet2")]
@@ -726,6 +728,7 @@ impl Network {
             "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
             "kusama" => Some(Network::Kusama),
+            "westend" => Some(Network::Westend),
             "moonriver" => Some(Network::Moonriver),
             "testnet2" => Some(Network::Testnet2),
             "fuji" => Some(Network::Fuji),
@@ -741,6 +744,7 @@ impl Network {
             Network::Volta => "volta".to_string(),
             Network::Ghostnet => "ghostnet".to_string(),
             Network::Kusama => "kusama".to_string(),
+            Network::Westend => "westend".to_string(),
             Network::Moonriver => "moonriver".to_string(),
             Network::Testnet2 => "testnet2".to_string(),
             Network::Fuji => "fuji".to_string(),
@@ -757,6 +761,7 @@ impl std::fmt::Display for Network {
             Network::Volta => "volta",
             Network::Ghostnet => "ghostnet",
             Network::Kusama => "kusama",
+            Network::Westend => "westend",
             Network::Moonriver => "moonriver",
             Network::Testnet2 => "testnet2",
             Network::Fuji => "fuji",
