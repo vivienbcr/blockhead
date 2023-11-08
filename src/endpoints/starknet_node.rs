@@ -95,10 +95,7 @@ impl StarknetNode {
         let body = JsonRpcReq {
             jsonrpc: JSON_RPC_VER.to_string(),
             method: "starknet_blockHashAndNumber".to_string(),
-            params: vec![
-                JsonRpcParams::String("latest".to_string()),
-                JsonRpcParams::Bool(false),
-            ],
+            params: vec![],
             id: 1,
         };
         let req = JsonRpcReqBody::Single(body);
