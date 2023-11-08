@@ -1,5 +1,6 @@
 target
 bh.redb
+blockhead.db
 config.yaml
 *.json
 *.env
