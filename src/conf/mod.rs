@@ -169,7 +169,7 @@ where
                 let network = match network {
                     Some(n) => n,
                     _ => {
-                        panic!("Unkonwn protocol: {} found in configuration file", proto)
+                        panic!("Unknown network: {} found in configuration file for protocol {}", net, proto)
                     }
                 };
                 let o: Value = serde_json::from_str(&opts.to_string()).unwrap();
@@ -185,6 +185,7 @@ where
                                 &NetworkAppOptionsConfigF::deserialize(opt).unwrap(),
                             )
                             .unwrap();
+
                         net_opts.insert(network, net_opt);
                     }
                     None => {
@@ -195,6 +196,7 @@ where
                  * Deserialize providers
                  */
                 let mut providers = Vec::new();
+                let mut alias_list = Vec::new();
                 o.as_object().unwrap().iter().for_each(|(provider, opt)| {
                     let endpoints_options: Value = serde_json::from_str(&opt.to_string()).unwrap();
                     match provider.as_str() {
@@ -217,6 +219,13 @@ where
                                     );
 
                                     debug!("endpoint_opt: {:?}", endpoint_opts);
+                                    // add alias to alias list
+
+                                    if !alias_list.contains(&endpoint_opts.alias) {
+                                        alias_list.push(endpoint_opts.alias.clone());
+                                    } else {
+                                        panic!("Found duplicated alias {} in config file at protocol: {} network: {} ", endpoint_opts.alias, protocol, network);
+                                    }
                                     let rpc_provider = Provider::from_str(
                                         &format!("{}_node", protocol),
                                         endpoint_opts,
@@ -486,6 +495,8 @@ pub struct ProviderOptsConfigF {
     #[serde(default = "default_headers")]
     pub headers: Option<HashMap<String, String>>,
     pub basic_auth: Option<BasicAuth>,
+    #[serde(default = "default_alias")]
+    pub alias: String,
 }
 fn default_headers() -> Option<HashMap<String, String>> {
     None
@@ -555,6 +566,8 @@ pub struct EndpointOptions {
     pub timeout: u32,
     pub headers: Option<HashMap<String, String>>,
     pub basic_auth: Option<BasicAuth>,
+    #[serde(default = "default_alias")]
+    pub alias: String,
 }
 impl Default for EndpointOptions {
     fn default() -> Self {
@@ -569,9 +582,26 @@ impl Default for EndpointOptions {
                 timeout: default_endpoint_request_timeout(),
                 headers: None,
                 basic_auth: None,
+                alias: "".to_string(),
             },
         }
     }
+}
+fn get_base_url(url: &str) -> String {
+    let base_url = url
+        .split('/')
+        .nth(2)
+        .unwrap_or("unknown")
+        .split(':')
+        .next()
+        .unwrap_or("unknown")
+        .to_string();
+    // if base_url split . len > 2 => take last 2
+    let mut base_url = base_url.split('.').collect::<Vec<&str>>();
+    if base_url.len() > 2 {
+        base_url = base_url[base_url.len() - 2..].to_vec();
+    }
+    base_url.join(".")
 }
 impl EndpointOptions {
     /**
@@ -587,6 +617,8 @@ impl EndpointOptions {
         if let Some(url) = provider.url {
             endpoint_opt.url = Some(url);
         }
+        endpoint_opt.alias = get_base_url(endpoint_opt.url.clone().unwrap().as_str());
+
         if let Some(options) = provider.options {
             if let Some(retry) = options.retry {
                 endpoint_opt.retry = retry;
@@ -602,6 +634,9 @@ impl EndpointOptions {
             }
             if let Some(basic_auth) = options.basic_auth {
                 endpoint_opt.basic_auth = Some(basic_auth);
+            }
+            if options.alias != default_alias() {
+                endpoint_opt.alias = options.alias;
             }
         }
         endpoint_opt
@@ -620,6 +655,7 @@ impl EndpointOptions {
             timeout: default_endpoint_request_timeout(),
             headers,
             basic_auth,
+            alias: get_base_url(url),
         }
     }
 }
@@ -847,6 +883,10 @@ pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
 fn default_database_keep_history() -> u32 {
     DEFAULT_DATABASE_KEEP_HISTORY
 }
+pub const DEFAULT_ALIAS: &str = "unknown";
+fn default_alias() -> String {
+    DEFAULT_ALIAS.to_string()
+}
 
 pub const DEFAULT_CONFIG_PATH: &str = "config.yaml";
 
@@ -885,6 +925,7 @@ impl Configuration {
             .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
             .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
             .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
+            .set_default("global.endpoint.alias", DEFAULT_ALIAS)?
             .add_source(File::from(conf_path))
             .build()?;
 
@@ -975,6 +1016,19 @@ mod test {
     use crate::{conf::*, tests};
     use std::ffi::OsString;
     #[test]
+    fn test_prom_get_base_url() {
+        assert_eq!(get_base_url("https://api.domain.tld"), "domain.tld");
+        assert_eq!(get_base_url("https://api.domain.tld:1234"), "domain.tld");
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234/somethings"),
+            "domain.tld"
+        );
+        assert_eq!(
+            get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
+            "domain.tld"
+        );
+    }
+    #[test]
     // test_config_endpoint
 
     fn conf_struct_endpoint_options() {
@@ -1014,6 +1068,7 @@ mod test {
             rate: Some(60),
             headers: Some(headers),
             basic_auth: Some(basic_auth),
+            alias: default_alias(),
         };
 
         let provider_config_f = ProviderConfigF {
