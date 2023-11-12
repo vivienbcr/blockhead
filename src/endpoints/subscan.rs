@@ -65,7 +65,7 @@ impl ProviderActions for Subscan {
         /*
          * Get the head block to check if there is a new block
          */
-        if &block_head.hash == &previous_head {
+        if block_head.hash == previous_head {
             debug!(
                 "No new block (head: {} block with hash {}), skip task",
                 block_head.block_num, block_head.hash
@@ -187,7 +187,7 @@ impl Subscan {
         finalized_blocks.sort_by(|a, b| b.block_num.cmp(&a.block_num));
         let mut blocks = vec![];
         // from hash is none, we take just last blocks finalized from the last block
-        let mut found = if from_hash.is_none() { true } else { false };
+        let mut found = from_hash.is_none();
         let from_hash = from_hash.unwrap_or("".to_string());
         // find the block with the same hash as the previous head
         for block in finalized_blocks {

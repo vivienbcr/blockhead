@@ -76,7 +76,7 @@ pub fn track_response_time(
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             &base_domain,
-            &method.to_string(),
+            (method.as_ref()),
             &protocol.to_string(),
             &network.to_string(),
         ])
@@ -119,7 +119,7 @@ fn get_base_url(url: &str) -> String {
         .nth(2)
         .unwrap_or("unknown")
         .split(':')
-        .nth(0)
+        .next()
         .unwrap_or("unknown")
         .to_string();
     // if base_url split . len > 2 => take last 2
@@ -127,7 +127,7 @@ fn get_base_url(url: &str) -> String {
     if base_url.len() > 2 {
         base_url = base_url[base_url.len() - 2..].to_vec();
     }
-    base_url.join(".").to_string()
+    base_url.join(".")
 }
 
 fn get_endpoint_status_metric(url: &str, protocol: &Protocol, network: &Network) -> bool {

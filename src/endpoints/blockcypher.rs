@@ -76,7 +76,7 @@ impl Blockcypher {
         &mut self,
     ) -> Result<HeightResponse, Box<dyn std::error::Error + Send + Sync>> {
         trace!("Get head blockcypher");
-        let url = format!("{}", self.endpoint.url);
+        let url = self.endpoint.url.to_string();
         let client = &mut self.endpoint.reqwest;
         let res: HeightResponse = client
             .run_request(

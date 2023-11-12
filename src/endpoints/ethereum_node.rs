@@ -93,7 +93,7 @@ impl EthereumNode {
         let req = match block_numbers {
             Some(block_numbers) => {
                 let mut batch = Vec::new();
-                block_numbers.into_iter().for_each(|block_number| {
+                block_numbers.iter().for_each(|block_number| {
                     let body = JsonRpcReq {
                         jsonrpc: JSON_RPC_VER.to_string(),
                         method: "eth_getBlockByNumber".to_string(),

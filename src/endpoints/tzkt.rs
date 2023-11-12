@@ -106,7 +106,7 @@ impl Tzkt {
                 &self.endpoint.network,
             )
             .await?;
-        if res.len() == 0 {
+        if res.is_empty() {
             return Err("Error: No head found".into());
         }
         Ok(res[0].clone())

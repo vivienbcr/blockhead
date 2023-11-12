@@ -24,7 +24,7 @@ impl Redb {
             Ok(db) => {
                 info!("Redb::new() db is ok");
                 let db = db;
-                DATABASE.set(Redb { db: db }).unwrap();
+                DATABASE.set(Redb { db }).unwrap();
                 Ok(())
             }
             Err(e) => {
@@ -37,7 +37,7 @@ impl Redb {
                                 match db {
                                     Ok(db) => {
                                         info!("Redb db is created");
-                                        let rdb = Redb { db: db };
+                                        let rdb = Redb { db };
                                         // it seem if we don't insert a first data, db will not be able to be reopen
                                         rdb.set("keep", "1")?;
                                         DATABASE.set(rdb).unwrap();
@@ -45,19 +45,19 @@ impl Redb {
                                     }
                                     Err(e) => {
                                         error!("Redb db is not created {:?}", e);
-                                        return Err(Box::new(e));
+                                        Err(Box::new(e))
                                     }
                                 }
                             }
                             _ => {
                                 error!("Redb db another io error {:?}", e);
-                                return Err(Box::new(e));
+                                Err(Box::new(e))
                             }
                         }
                     }
                     _ => {
                         error!("Redb db another error {:?}", e);
-                        return Err(Box::new(e));
+                        Err(Box::new(e))
                     }
                 }
             }
@@ -77,7 +77,7 @@ impl Redb {
         Ok(())
     }
     fn to_db_key(protocol: &Protocol, network: &Network) -> String {
-        format!("{}-{}", protocol.to_string(), network.to_string())
+        format!("{}-{}", protocol, network)
     }
     pub fn get_blockchain(
         &self,
@@ -92,11 +92,11 @@ impl Redb {
         match res {
             Some(data) => {
                 let blockchain: blockchain::Blockchain = serde_json::from_str(data.value())?;
-                return Ok(blockchain);
+                Ok(blockchain)
             }
             None => {
                 debug!("Redb get_blockchain return an empty response.");
-                return Err("Error: Reddb return None".into());
+                Err("Error: Reddb return None".into())
             }
         }
     }
@@ -108,7 +108,7 @@ impl Redb {
         network: &Network,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Redb set_blockchain({:?},{:?})", protocol, network);
-        let chain_db = self.get_blockchain(&protocol, &network);
+        let chain_db = self.get_blockchain(protocol, network);
         let chain_db = match chain_db {
             Ok(data) => data,
             Err(e) => {
@@ -119,7 +119,7 @@ impl Redb {
                 blockchain::Blockchain::new(None)
             }
         };
-        if (chain_db.height == blockchain.height) || chain_db.height > blockchain.height {
+        if chain_db.height >= blockchain.height {
             debug!("Redb set_blockchain: same height, do nothing");
             return Ok(());
         }
@@ -132,7 +132,6 @@ impl Redb {
 
         let mut merged_blocks: Vec<Block> = chain_db
             .blocks
-            .clone()
             .into_iter()
             .chain(blockchain.blocks.clone().into_iter())
             .fold(Vec::new(), |mut acc, b| {
@@ -153,7 +152,7 @@ impl Redb {
         let merged_blocks = merged_blocks.iter().take(keep as usize).cloned().collect();
         let mut blockchain = blockchain.clone();
         blockchain.blocks = merged_blocks;
-        let key = Redb::to_db_key(&protocol, &network);
+        let key = Redb::to_db_key(protocol, network);
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TABLE)?;

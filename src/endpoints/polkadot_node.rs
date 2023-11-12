@@ -126,7 +126,7 @@ impl PolkadotNode {
         &mut self,
         hashs: Vec<String>,
     ) -> Result<Vec<PolkadotBlockResponse>, Box<dyn std::error::Error + Send + Sync>> {
-        if hashs.len() == 0 {
+        if hashs.is_empty() {
             return Err("get_blocks: hashs is empty".into());
         };
 
@@ -159,6 +159,7 @@ fn get_block_timestamp(block: &PolkadotBlock) -> Option<u64> {
 // https://substrate.stackexchange.com/questions/2696/how-to-use-the-scale-decoder-to-parse-extrinsics
 // TODO: use scale codec to decode extrinsic
 // parity-scale-codec = {version= "3.4.0",  features = ["derive"] }
+#[allow(clippy::needless_range_loop)]
 fn decode_timestamp_extrinsic(extrinsic: &[u8]) -> Option<u64> {
     // Decode the compact u64 representing the timestamp
     let data = &extrinsic[4..];
@@ -170,7 +171,6 @@ fn decode_timestamp_extrinsic(extrinsic: &[u8]) -> Option<u64> {
     for i in 1..=6 {
         value += (data[i] as u64) << (8 * (i - 1));
     }
-
     Some(value)
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]

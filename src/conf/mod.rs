@@ -55,11 +55,10 @@ impl Configuration {
 pub fn get_configuration() -> Option<Configuration> {
     let config = CONFIGURATION.read();
     // if lock error
-    let r = match config {
+    match config {
         Ok(c) => c.clone(),
         Err(e) => panic!("Error while getting configuration: {}", e),
-    };
-    r
+    }
 }
 pub fn set_configuration(
     conf: Option<Configuration>,
@@ -82,12 +81,12 @@ pub fn get_enabled_protocol_network() -> Option<HashMap<Protocol, Vec<Network>>>
     let mut res = HashMap::new();
     for (proto, networks) in &config.proto_opts {
         let mut net_names = Vec::new();
-        for (net, _) in networks {
-            net_names.push(net.clone().into());
+        for net in networks {
+            net_names.push(*net.0);
         }
-        res.insert(proto.clone().into(), net_names);
+        res.insert(*proto, net_names);
     }
-    if res.len() == 0 {
+    if res.is_empty() {
         return None;
     }
     Some(res)
@@ -186,10 +185,10 @@ where
                                 &NetworkAppOptionsConfigF::deserialize(opt).unwrap(),
                             )
                             .unwrap();
-                        net_opts.insert(network.clone(), net_opt);
+                        net_opts.insert(network, net_opt);
                     }
                     None => {
-                        net_opts.insert(network.clone(), global.networks_options.clone());
+                        net_opts.insert(network, global.networks_options.clone());
                     }
                 }
                 /*
@@ -219,7 +218,7 @@ where
 
                                     debug!("endpoint_opt: {:?}", endpoint_opts);
                                     let rpc_provider = Provider::from_str(
-                                        &format!("{}_node", protocol.to_string()),
+                                        &format!("{}_node", protocol),
                                         endpoint_opts,
                                         &network,
                                     );
@@ -252,11 +251,11 @@ where
                     network.to_string(),
                     providers.len()
                 );
-                net_providers.insert(network.clone(), providers);
+                net_providers.insert(network, providers);
             });
             // After deserialization, if user didn't specify network options we use global options
-            proto_opts.insert(protocol.clone(), net_opts);
-            proto_providers.insert(protocol.clone(), net_providers);
+            proto_opts.insert(protocol, net_opts);
+            proto_providers.insert(protocol, net_providers);
         });
     Ok(ProtoOptsProvider {
         proto_opts,
@@ -422,22 +421,22 @@ impl Provider {
         }
     }
     pub fn is_available(provider: &str) -> bool {
-        match provider {
-            "blockstream" => true,
-            "blockcypher" => true,
-            "bitcoin_node" => true,
-            "ethereum_node" => true,
-            "ewf_node" => true,
-            "tezos_node" => true,
-            "tzkt" => true,
-            "tzstats" => true,
-            "polkadot_node" => true,
-            "subscan" => true,
-            "moonbeam_node" => true,
-            "starknet_node" => true,
-            "avalanche_node" => true,
-            _ => false,
-        }
+        matches!(
+            provider,
+            "blockstream"
+                | "blockcypher"
+                | "bitcoin_node"
+                | "ethereum_node"
+                | "ewf_node"
+                | "tezos_node"
+                | "tzkt"
+                | "tzstats"
+                | "polkadot_node"
+                | "subscan"
+                | "moonbeam_node"
+                | "starknet_node"
+                | "avalanche_node"
+        )
     }
 }
 
@@ -510,8 +509,6 @@ where
                     n.as_i64().unwrap().to_string()
                 } else if n.is_u64() {
                     n.as_u64().unwrap().to_string()
-                } else if n.is_f64() {
-                    n.as_f64().unwrap().to_string()
                 } else {
                     n.as_f64().unwrap().to_string()
                 }
@@ -563,7 +560,7 @@ impl Default for EndpointOptions {
     fn default() -> Self {
         let global = get_configuration();
         match global {
-            Some(g) => g.global.endpoints.clone(),
+            Some(g) => g.global.endpoints,
             None => EndpointOptions {
                 url: None,
                 retry: default_endpoint_retry(),
@@ -663,19 +660,6 @@ impl Protocol {
             _ => None,
         }
     }
-    pub fn to_string(&self) -> String {
-        match self {
-            Protocol::Bitcoin => "bitcoin".to_string(),
-            Protocol::Ethereum => "ethereum".to_string(),
-            Protocol::Ewf => "ewf".to_string(),
-            Protocol::Tezos => "tezos".to_string(),
-            Protocol::Polkadot => "polkadot".to_string(),
-            Protocol::Moonbeam => "moonbeam".to_string(),
-            Protocol::Starknet => "starknet".to_string(),
-            Protocol::Avalanche => "avalanche".to_string(),
-            Protocol::None => "None".to_string(),
-        }
-    }
 }
 impl std::fmt::Display for Protocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -735,21 +719,6 @@ impl Network {
             _ => None,
         }
     }
-    pub fn to_string(&self) -> String {
-        match self {
-            Network::Mainnet => "mainnet".to_string(),
-            Network::Testnet => "testnet".to_string(),
-            Network::Goerli => "goerli".to_string(),
-            Network::Sepolia => "sepolia".to_string(),
-            Network::Volta => "volta".to_string(),
-            Network::Ghostnet => "ghostnet".to_string(),
-            Network::Kusama => "kusama".to_string(),
-            Network::Westend => "westend".to_string(),
-            Network::Moonriver => "moonriver".to_string(),
-            Network::Testnet2 => "testnet2".to_string(),
-            Network::Fuji => "fuji".to_string(),
-        }
-    }
 }
 impl std::fmt::Display for Network {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -801,32 +770,34 @@ impl Endpoint {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
 pub enum LogLevel {
+    #[default]
     Info,
     Debug,
     Trace,
 }
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Info
+
+impl std::str::FromStr for LogLevel {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "info" => Ok(LogLevel::Info),
+            "debug" => Ok(LogLevel::Debug),
+            "trace" => Ok(LogLevel::Trace),
+            _ => Err(()),
+        }
     }
 }
-impl LogLevel {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "info" => Some(LogLevel::Info),
-            "debug" => Some(LogLevel::Debug),
-            "trace" => Some(LogLevel::Trace),
-            _ => None,
-        }
-    }
-    pub fn to_string(&self) -> String {
-        match self {
-            LogLevel::Info => "info".to_string(),
-            LogLevel::Debug => "debug".to_string(),
-            LogLevel::Trace => "trace".to_string(),
-        }
+// implement trait `Display` for type `conf::LogLevel` instead
+impl std::fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            LogLevel::Info => "info",
+            LogLevel::Debug => "debug",
+            LogLevel::Trace => "trace",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -922,10 +893,11 @@ impl Configuration {
             Ok(c) => c,
             Err(e) => return Err(e),
         };
-        match args.db_path {
-            Some(p) => config.database.path = p,
-            None => {}
-        };
+
+        if let Some(p) = args.db_path {
+            config.database.path = p
+        }
+
         if init {
             set_configuration(Some(config.clone())).unwrap();
         }
@@ -941,10 +913,10 @@ pub fn init_logger(args: Option<Vec<OsString>>) {
     };
     let log_level = match args.log_level {
         Some(l) => l,
-        None => LogLevel::from_str(DEFAULT_LOG_LEVEL).unwrap(),
+        None => LogLevel::default(),
     };
 
-    let env = Env::default().default_filter_or(format!("blockhead={}", log_level.to_string()));
+    let env = Env::default().default_filter_or(format!("blockhead={}", log_level));
     env_logger::init_from_env(env);
 }
 
