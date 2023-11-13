@@ -4,21 +4,22 @@ Blockhead is simple application used to parse blockchains head state and monitor
 
 ## Supported blockchains / providers
 
-| Blockchain | Network | Endpoint                                                                           | Notes                                                                                                  |
-| ---------- | ------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Bitcoin    | Mainnet, Testnet | [RPC](https://developer.bitcoin.org/reference/rpc/)                                |                                                                                                        |
-|            |         | [Blockstream](https://github.com/Blockstream/esplora/blob/master/API.md)           |                                                                                                        |
-|            |         | [Blockcypher](https://www.blockcypher.com/dev/bitcoin/#introduction)               | Tune rate limit to don't reach [429 Errors](https://developer.mozilla.org/fr/docs/Web/HTTP/Status/429) |
+| Blockchain | Network                  | Endpoint                                                                           | Notes                                                                                                  |
+| ---------- | ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Bitcoin    | Mainnet, Testnet         | [RPC](https://developer.bitcoin.org/reference/rpc/)                                |                                                                                                        |
+|            |                          | [Blockstream](https://github.com/Blockstream/esplora/blob/master/API.md)           |                                                                                                        |
+|            |                          | [Blockcypher](https://www.blockcypher.com/dev/bitcoin/#introduction)               | Tune rate limit to don't reach [429 Errors](https://developer.mozilla.org/fr/docs/Web/HTTP/Status/429) |
 | Ethereum   | Mainnet, Goerli, Sepolia | [RPC](https://ethereum.org/en/developers/docs/apis/json-rpc/)                      |                                                                                                        |
-| Tezos      | Mainnet, Ghostnet | [RPC](https://tezos.gitlab.io/active/rpc.html)                                     |                                                                                                        |
-|            |         | [Tzkt](https://api.tzkt.io/)                                                       |                                                                                                        |
-|            |         | [Tzstats](https://tzstats.com/docs/api#tezos-api)                                  |                                                                                                        |
-| Ewf        | Mainnet, Volta | [RPC](https://github.com/energywebfoundation/ewf-rpc)                              |                                                                                                        |
+| Tezos      | Mainnet, Ghostnet        | [RPC](https://tezos.gitlab.io/active/rpc.html)                                     |                                                                                                        |
+|            |                          | [Tzkt](https://api.tzkt.io/)                                                       |                                                                                                        |
+|            |                          | [Tzstats](https://tzstats.com/docs/api#tezos-api)                                  |                                                                                                        |
+| Ewf        | Mainnet, Volta           | [RPC](https://github.com/energywebfoundation/ewf-rpc)                              |                                                                                                        |
 | Polkadot   | Mainnet, Westend, Kusama | [RPC](https://polkadot.js.org/docs/substrate/rpc/)                                 |                                                                                                        |
-|            |         | [Subscan](https://support.subscan.io)                                              |                                                                                                        |
-| Moonbeam   | Mainnet, Moonriver | [RPC](https://docs.moonbeam.network/builders/get-started/eth-compare/rpc-support/) |                                                                                                        |
-| Starknet   | Mainnet, Testnet2 | [RPC](https://github.com/starkware-libs/starknet-specs)                            |                                                                                                        |
-| Avalanche  | Mainnet, Fuji | [RPC](https://docs.avax.network/apis/avalanchego/apis/c-chain)                     | For https://api.avax.network/ext/bc/C/rpc use https://api.avax.network                                 |
+|            |                          | [Subscan](https://support.subscan.io)                                              |                                                                                                        |
+| Moonbeam   | Mainnet, Moonriver       | [RPC](https://docs.moonbeam.network/builders/get-started/eth-compare/rpc-support/) |                                                                                                        |
+| Starknet   | Mainnet, Testnet2        | [RPC](https://github.com/starkware-libs/starknet-specs)                            |                                                                                                        |
+| Avalanche  | Mainnet, Fuji            | [RPC](https://docs.avax.network/apis/avalanchego/apis/c-chain)                     | For https://api.avax.network/ext/bc/C/rpc use https://api.avax.network                                 |
+| Polygon    | Mainnet, Mumbai          | [RPC](https://wiki.polygon.technology)                                             |                                                                                                        |
 
 ## Features
 
@@ -67,6 +68,7 @@ protocols:
             retry: 10
             delay: 1
             rate: 1
+            label: mysuperrpcnode
         - url: https://sample2.bitcoin.mainnet.rpc
           options:
             basic-auth:

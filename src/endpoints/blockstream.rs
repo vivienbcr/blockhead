@@ -63,7 +63,7 @@ impl ProviderActions for Blockstream {
             blockchain.blocks.truncate(n_block as usize);
         }
         set_blockchain_height_endpoint(
-            &self.endpoint.url,
+            &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
             blockchain.height,
