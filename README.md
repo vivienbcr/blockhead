@@ -19,6 +19,7 @@ Blockhead is simple application used to parse blockchains head state and monitor
 | Moonbeam   | Mainnet, Moonriver       | [RPC](https://docs.moonbeam.network/builders/get-started/eth-compare/rpc-support/) |                                                                                                        |
 | Starknet   | Mainnet, Testnet2        | [RPC](https://github.com/starkware-libs/starknet-specs)                            |                                                                                                        |
 | Avalanche  | Mainnet, Fuji            | [RPC](https://docs.avax.network/apis/avalanchego/apis/c-chain)                     | For https://api.avax.network/ext/bc/C/rpc use https://api.avax.network                                 |
+| Polygon    | Mainnet, Mumbai          | [RPC](https://wiki.polygon.technology)                                             |                                                                                                        |
 
 ## Features
 
