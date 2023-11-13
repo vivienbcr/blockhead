@@ -55,11 +55,10 @@ impl Configuration {
 pub fn get_configuration() -> Option<Configuration> {
     let config = CONFIGURATION.read();
     // if lock error
-    let r = match config {
+    match config {
         Ok(c) => c.clone(),
         Err(e) => panic!("Error while getting configuration: {}", e),
-    };
-    r
+    }
 }
 pub fn set_configuration(
     conf: Option<Configuration>,
@@ -82,12 +81,12 @@ pub fn get_enabled_protocol_network() -> Option<HashMap<Protocol, Vec<Network>>>
     let mut res = HashMap::new();
     for (proto, networks) in &config.proto_opts {
         let mut net_names = Vec::new();
-        for (net, _) in networks {
-            net_names.push(net.clone().into());
+        for net in networks {
+            net_names.push(*net.0);
         }
-        res.insert(proto.clone().into(), net_names);
+        res.insert(*proto, net_names);
     }
-    if res.len() == 0 {
+    if res.is_empty() {
         return None;
     }
     Some(res)
@@ -170,7 +169,7 @@ where
                 let network = match network {
                     Some(n) => n,
                     _ => {
-                        panic!("Unkonwn protocol: {} found in configuration file", proto)
+                        panic!("Unknown network: {} found in configuration file for protocol {}", net, proto)
                     }
                 };
                 let o: Value = serde_json::from_str(&opts.to_string()).unwrap();
@@ -186,16 +185,18 @@ where
                                 &NetworkAppOptionsConfigF::deserialize(opt).unwrap(),
                             )
                             .unwrap();
-                        net_opts.insert(network.clone(), net_opt);
+
+                        net_opts.insert(network, net_opt);
                     }
                     None => {
-                        net_opts.insert(network.clone(), global.networks_options.clone());
+                        net_opts.insert(network, global.networks_options.clone());
                     }
                 }
                 /*
                  * Deserialize providers
                  */
                 let mut providers = Vec::new();
+                let mut alias_list = Vec::new();
                 o.as_object().unwrap().iter().for_each(|(provider, opt)| {
                     let endpoints_options: Value = serde_json::from_str(&opt.to_string()).unwrap();
                     match provider.as_str() {
@@ -218,8 +219,15 @@ where
                                     );
 
                                     debug!("endpoint_opt: {:?}", endpoint_opts);
+                                    // add alias to alias list
+
+                                    if !alias_list.contains(&endpoint_opts.alias) {
+                                        alias_list.push(endpoint_opts.alias.clone());
+                                    } else {
+                                        panic!("Found duplicated alias {} in config file at protocol: {} network: {} ", endpoint_opts.alias, protocol, network);
+                                    }
                                     let rpc_provider = Provider::from_str(
-                                        &format!("{}_node", protocol.to_string()),
+                                        &format!("{}_node", protocol),
                                         endpoint_opts,
                                         &network,
                                     );
@@ -252,11 +260,11 @@ where
                     network.to_string(),
                     providers.len()
                 );
-                net_providers.insert(network.clone(), providers);
+                net_providers.insert(network, providers);
             });
             // After deserialization, if user didn't specify network options we use global options
-            proto_opts.insert(protocol.clone(), net_opts);
-            proto_providers.insert(protocol.clone(), net_providers);
+            proto_opts.insert(protocol, net_opts);
+            proto_providers.insert(protocol, net_providers);
         });
     Ok(ProtoOptsProvider {
         proto_opts,
@@ -316,6 +324,7 @@ pub enum Provider {
     MoonbeamNode(EthereumNode),
     StarknetNode(StarknetNode),
     AvalancheNode(EthereumNode),
+    PolygonNode(EthereumNode),
     None,
 }
 #[cfg(test)]
@@ -380,6 +389,9 @@ impl Provider {
                 Provider::EthereumNode(EthereumNode::new(endpoint_opt, Protocol::Ethereum, n))
             }
             "ewf_node" => Provider::EwfNode(EthereumNode::new(endpoint_opt, Protocol::Ewf, n)),
+            "polygon_node" => {
+                Provider::PolygonNode(EthereumNode::new(endpoint_opt, Protocol::Polygon, n))
+            }
             "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, Protocol::Tezos, n)),
             "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, Protocol::Tezos, n)),
             "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, Protocol::Tezos, n)),
@@ -410,6 +422,7 @@ impl Provider {
             Provider::BitcoinNode(provider) => Some(provider),
             Provider::EthereumNode(provider) => Some(provider),
             Provider::EwfNode(provider) => Some(provider),
+            Provider::PolygonNode(provider) => Some(provider),
             Provider::TezosNode(provider) => Some(provider),
             Provider::Tzkt(provider) => Some(provider),
             Provider::TzStats(provider) => Some(provider),
@@ -422,22 +435,23 @@ impl Provider {
         }
     }
     pub fn is_available(provider: &str) -> bool {
-        match provider {
-            "blockstream" => true,
-            "blockcypher" => true,
-            "bitcoin_node" => true,
-            "ethereum_node" => true,
-            "ewf_node" => true,
-            "tezos_node" => true,
-            "tzkt" => true,
-            "tzstats" => true,
-            "polkadot_node" => true,
-            "subscan" => true,
-            "moonbeam_node" => true,
-            "starknet_node" => true,
-            "avalanche_node" => true,
-            _ => false,
-        }
+        matches!(
+            provider,
+            "blockstream"
+                | "blockcypher"
+                | "bitcoin_node"
+                | "ethereum_node"
+                | "ewf_node"
+                | "polygon_node"
+                | "tezos_node"
+                | "tzkt"
+                | "tzstats"
+                | "polkadot_node"
+                | "subscan"
+                | "moonbeam_node"
+                | "starknet_node"
+                | "avalanche_node"
+        )
     }
 }
 
@@ -487,6 +501,8 @@ pub struct ProviderOptsConfigF {
     #[serde(default = "default_headers")]
     pub headers: Option<HashMap<String, String>>,
     pub basic_auth: Option<BasicAuth>,
+    #[serde(default = "default_alias")]
+    pub alias: String,
 }
 fn default_headers() -> Option<HashMap<String, String>> {
     None
@@ -510,8 +526,6 @@ where
                     n.as_i64().unwrap().to_string()
                 } else if n.is_u64() {
                     n.as_u64().unwrap().to_string()
-                } else if n.is_f64() {
-                    n.as_f64().unwrap().to_string()
                 } else {
                     n.as_f64().unwrap().to_string()
                 }
@@ -558,12 +572,14 @@ pub struct EndpointOptions {
     pub timeout: u32,
     pub headers: Option<HashMap<String, String>>,
     pub basic_auth: Option<BasicAuth>,
+    #[serde(default = "default_alias")]
+    pub alias: String,
 }
 impl Default for EndpointOptions {
     fn default() -> Self {
         let global = get_configuration();
         match global {
-            Some(g) => g.global.endpoints.clone(),
+            Some(g) => g.global.endpoints,
             None => EndpointOptions {
                 url: None,
                 retry: default_endpoint_retry(),
@@ -572,10 +588,16 @@ impl Default for EndpointOptions {
                 timeout: default_endpoint_request_timeout(),
                 headers: None,
                 basic_auth: None,
+                alias: "".to_string(),
             },
         }
     }
 }
+fn get_base_url(url: &str) -> String {
+    let base_url = url.split('/').nth(2).unwrap_or("unknown");
+    base_url.to_string()
+}
+
 impl EndpointOptions {
     /**
      * from_provider_config_f is used to create EndpointOptions from ProviderConfigF
@@ -590,6 +612,8 @@ impl EndpointOptions {
         if let Some(url) = provider.url {
             endpoint_opt.url = Some(url);
         }
+        endpoint_opt.alias = get_base_url(endpoint_opt.url.clone().unwrap().as_str());
+
         if let Some(options) = provider.options {
             if let Some(retry) = options.retry {
                 endpoint_opt.retry = retry;
@@ -605,6 +629,9 @@ impl EndpointOptions {
             }
             if let Some(basic_auth) = options.basic_auth {
                 endpoint_opt.basic_auth = Some(basic_auth);
+            }
+            if options.alias != default_alias() {
+                endpoint_opt.alias = options.alias;
             }
         }
         endpoint_opt
@@ -623,6 +650,7 @@ impl EndpointOptions {
             timeout: default_endpoint_request_timeout(),
             headers,
             basic_auth,
+            alias: get_base_url(url),
         }
     }
 }
@@ -635,6 +663,8 @@ pub enum Protocol {
     Ethereum,
     #[serde(rename = "ewf")]
     Ewf,
+    #[serde(rename = "polygon")]
+    Polygon,
     #[serde(rename = "tezos")]
     Tezos,
     #[serde(rename = "polkadot")]
@@ -655,25 +685,13 @@ impl Protocol {
             "bitcoin" => Some(Protocol::Bitcoin),
             "ethereum" => Some(Protocol::Ethereum),
             "ewf" => Some(Protocol::Ewf),
+            "polygon" => Some(Protocol::Polygon),
             "tezos" => Some(Protocol::Tezos),
             "polkadot" => Some(Protocol::Polkadot),
             "moonbeam" => Some(Protocol::Moonbeam),
             "starknet" => Some(Protocol::Starknet),
             "avalanche" => Some(Protocol::Avalanche),
             _ => None,
-        }
-    }
-    pub fn to_string(&self) -> String {
-        match self {
-            Protocol::Bitcoin => "bitcoin".to_string(),
-            Protocol::Ethereum => "ethereum".to_string(),
-            Protocol::Ewf => "ewf".to_string(),
-            Protocol::Tezos => "tezos".to_string(),
-            Protocol::Polkadot => "polkadot".to_string(),
-            Protocol::Moonbeam => "moonbeam".to_string(),
-            Protocol::Starknet => "starknet".to_string(),
-            Protocol::Avalanche => "avalanche".to_string(),
-            Protocol::None => "None".to_string(),
         }
     }
 }
@@ -683,6 +701,7 @@ impl std::fmt::Display for Protocol {
             Protocol::Bitcoin => "bitcoin",
             Protocol::Ethereum => "ethereum",
             Protocol::Ewf => "ewf",
+            Protocol::Polygon => "polygon",
             Protocol::Tezos => "tezos",
             Protocol::Polkadot => "polkadot",
             Protocol::Moonbeam => "moonbeam",
@@ -733,21 +752,6 @@ impl Network {
             "testnet2" => Some(Network::Testnet2),
             "fuji" => Some(Network::Fuji),
             _ => None,
-        }
-    }
-    pub fn to_string(&self) -> String {
-        match self {
-            Network::Mainnet => "mainnet".to_string(),
-            Network::Testnet => "testnet".to_string(),
-            Network::Goerli => "goerli".to_string(),
-            Network::Sepolia => "sepolia".to_string(),
-            Network::Volta => "volta".to_string(),
-            Network::Ghostnet => "ghostnet".to_string(),
-            Network::Kusama => "kusama".to_string(),
-            Network::Westend => "westend".to_string(),
-            Network::Moonriver => "moonriver".to_string(),
-            Network::Testnet2 => "testnet2".to_string(),
-            Network::Fuji => "fuji".to_string(),
         }
     }
 }
@@ -801,32 +805,34 @@ impl Endpoint {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug, Default)]
 pub enum LogLevel {
+    #[default]
     Info,
     Debug,
     Trace,
 }
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Info
+
+impl std::str::FromStr for LogLevel {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "info" => Ok(LogLevel::Info),
+            "debug" => Ok(LogLevel::Debug),
+            "trace" => Ok(LogLevel::Trace),
+            _ => Err(()),
+        }
     }
 }
-impl LogLevel {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "info" => Some(LogLevel::Info),
-            "debug" => Some(LogLevel::Debug),
-            "trace" => Some(LogLevel::Trace),
-            _ => None,
-        }
-    }
-    pub fn to_string(&self) -> String {
-        match self {
-            LogLevel::Info => "info".to_string(),
-            LogLevel::Debug => "debug".to_string(),
-            LogLevel::Trace => "trace".to_string(),
-        }
+// implement trait `Display` for type `conf::LogLevel` instead
+impl std::fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            LogLevel::Info => "info",
+            LogLevel::Debug => "debug",
+            LogLevel::Trace => "trace",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -876,6 +882,10 @@ pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
 fn default_database_keep_history() -> u32 {
     DEFAULT_DATABASE_KEEP_HISTORY
 }
+pub const DEFAULT_ALIAS: &str = "unknown";
+fn default_alias() -> String {
+    DEFAULT_ALIAS.to_string()
+}
 
 pub const DEFAULT_CONFIG_PATH: &str = "config.yaml";
 
@@ -914,6 +924,7 @@ impl Configuration {
             .set_default("global.endpoints.retry", DEFAULT_ENDPOINT_RETRY)?
             .set_default("global.endpoints.delay", DEFAULT_ENDPOINT_DELAY)?
             .set_default("global.endpoints.rate", DEFAULT_ENDPOINT_REQUEST_RATE)?
+            .set_default("global.endpoint.alias", DEFAULT_ALIAS)?
             .add_source(File::from(conf_path))
             .build()?;
 
@@ -922,10 +933,11 @@ impl Configuration {
             Ok(c) => c,
             Err(e) => return Err(e),
         };
-        match args.db_path {
-            Some(p) => config.database.path = p,
-            None => {}
-        };
+
+        if let Some(p) = args.db_path {
+            config.database.path = p
+        }
+
         if init {
             set_configuration(Some(config.clone())).unwrap();
         }
@@ -941,10 +953,10 @@ pub fn init_logger(args: Option<Vec<OsString>>) {
     };
     let log_level = match args.log_level {
         Some(l) => l,
-        None => LogLevel::from_str(DEFAULT_LOG_LEVEL).unwrap(),
+        None => LogLevel::default(),
     };
 
-    let env = Env::default().default_filter_or(format!("blockhead={}", log_level.to_string()));
+    let env = Env::default().default_filter_or(format!("blockhead={}", log_level));
     env_logger::init_from_env(env);
 }
 
@@ -1003,6 +1015,22 @@ mod test {
     use crate::{conf::*, tests};
     use std::ffi::OsString;
     #[test]
+    fn test_prom_get_base_url() {
+        assert_eq!(get_base_url("https://api.domain.tld"), "api.domain.tld");
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234"),
+            "api.domain.tld:1234"
+        );
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234/somethings"),
+            "api.domain.tld:1234"
+        );
+        assert_eq!(
+            get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
+            "foo.bar.api.domain.tld:1234"
+        );
+    }
+    #[test]
     // test_config_endpoint
 
     fn conf_struct_endpoint_options() {
@@ -1042,6 +1070,7 @@ mod test {
             rate: Some(60),
             headers: Some(headers),
             basic_auth: Some(basic_auth),
+            alias: default_alias(),
         };
 
         let provider_config_f = ProviderConfigF {

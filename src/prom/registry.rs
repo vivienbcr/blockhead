@@ -29,7 +29,7 @@ pub fn register_custom_metrics() {
         .expect("collector can be registered");
 }
 pub fn track_status_code(
-    url: &str,
+    alias: &str,
     method: &str,
     status_code: u16,
     protocol: &Protocol,
@@ -37,17 +37,15 @@ pub fn track_status_code(
 ) {
     trace!(
         "track status code {} {} {} {} {}",
-        url,
+        alias,
         method,
         status_code,
         protocol.to_string(),
         network.to_string()
     );
-    // retain only https://domain.tld
-    let base_domain = get_base_url(url);
     metrics::HTTP_REQUEST_CODE
         .with_label_values(&[
-            &base_domain,
+            alias,
             &status_code.to_string(),
             method,
             &protocol.to_string(),
@@ -57,17 +55,15 @@ pub fn track_status_code(
 }
 
 pub fn track_response_time(
-    url: &str,
+    alias: &str,
     method: &reqwest::Method,
     protocol: &Protocol,
     network: &Network,
     time: u128,
 ) {
-    // retain only https://domain.tld
-    let base_domain = get_base_url(url);
     trace!(
         "track response time{} {} {} {} {}",
-        base_domain,
+        alias,
         method,
         protocol,
         network,
@@ -75,23 +71,21 @@ pub fn track_response_time(
     );
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            &base_domain,
-            &method.to_string(),
+            alias,
+            (method.as_ref()),
             &protocol.to_string(),
             &network.to_string(),
         ])
         .observe(time as f64);
 }
 pub fn set_blockchain_height_endpoint(
-    url: &str,
+    alias: &str,
     protocol: &Protocol,
     network: &Network,
     height: u64,
 ) {
-    // retain only https://domain.tld
-    let base_domain = get_base_url(url);
     BLOCKCHAIN_HEIGHT_ENDPOINT
-        .with_label_values(&[&base_domain, &protocol.to_string(), &network.to_string()])
+        .with_label_values(&[alias, &protocol.to_string(), &network.to_string()])
         .set(height as i64);
 }
 
@@ -113,58 +107,25 @@ pub fn set_blockchain_metrics(
         .set(head_txs);
 }
 
-fn get_base_url(url: &str) -> String {
-    let base_url = url
-        .split('/')
-        .nth(2)
-        .unwrap_or("unknown")
-        .split(':')
-        .nth(0)
-        .unwrap_or("unknown")
-        .to_string();
-    // if base_url split . len > 2 => take last 2
-    let mut base_url = base_url.split('.').collect::<Vec<&str>>();
-    if base_url.len() > 2 {
-        base_url = base_url[base_url.len() - 2..].to_vec();
-    }
-    base_url.join(".").to_string()
-}
-
-fn get_endpoint_status_metric(url: &str, protocol: &Protocol, network: &Network) -> bool {
-    // retain only https://domain.tld
-    let base_domain = get_base_url(url);
+fn get_endpoint_status_metric(alias: &str, protocol: &Protocol, network: &Network) -> bool {
     let state = metrics::ENDPOINT_STATUS
-        .with_label_values(&[&base_domain, &protocol.to_string(), &network.to_string()])
+        .with_label_values(&[alias, &protocol.to_string(), &network.to_string()])
         .get();
     state == 1
 }
-pub fn set_endpoint_status_metric(url: &str, protocol: &Protocol, network: &Network, state: bool) {
-    let m_state = get_endpoint_status_metric(url, protocol, network);
+pub fn set_endpoint_status_metric(
+    alias: &str,
+    protocol: &Protocol,
+    network: &Network,
+    state: bool,
+) {
+    let m_state = get_endpoint_status_metric(alias, protocol, network);
     if m_state == state {
         return;
     }
     let state = if state { 1 } else { 0 };
-    let base_domain = get_base_url(url);
+
     metrics::ENDPOINT_STATUS
-        .with_label_values(&[&base_domain, &protocol.to_string(), &network.to_string()])
+        .with_label_values(&[alias, &protocol.to_string(), &network.to_string()])
         .set(state);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_prom_get_base_url() {
-        assert_eq!(get_base_url("https://api.domain.tld"), "domain.tld");
-        assert_eq!(get_base_url("https://api.domain.tld:1234"), "domain.tld");
-        assert_eq!(
-            get_base_url("https://api.domain.tld:1234/somethings"),
-            "domain.tld"
-        );
-        assert_eq!(
-            get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
-            "domain.tld"
-        );
-    }
 }

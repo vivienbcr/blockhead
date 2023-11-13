@@ -6,11 +6,13 @@ pub struct ReqwestClient {
     // pub client: Client,
     pub config: EndpointOptions,
     pub last_request: u64,
+    pub alias: String,
 }
 
 impl ReqwestClient {
     pub fn new(config: EndpointOptions) -> ReqwestClient {
         ReqwestClient {
+            alias: config.alias.clone(),
             config,
             last_request: 0,
         }

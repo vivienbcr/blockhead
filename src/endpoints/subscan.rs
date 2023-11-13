@@ -65,7 +65,7 @@ impl ProviderActions for Subscan {
         /*
          * Get the head block to check if there is a new block
          */
-        if &block_head.hash == &previous_head {
+        if block_head.hash == previous_head {
             debug!(
                 "No new block (head: {} block with hash {}), skip task",
                 block_head.block_num, block_head.hash
@@ -73,9 +73,7 @@ impl ProviderActions for Subscan {
             return Err("No new block".into());
         }
         let mut blockchain = blockchain::Blockchain::new(None);
-        let res = self
-            .get_finalized_blocks(n_block as u16, Some(block_head.hash))
-            .await?;
+        let res = self.get_finalized_blocks(n_block as u16, None).await?;
 
         for block in res {
             let b = block.to_block();
@@ -84,7 +82,7 @@ impl ProviderActions for Subscan {
         blockchain.sort();
 
         set_blockchain_height_endpoint(
-            &self.endpoint.url,
+            &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
             blockchain.height,
@@ -187,15 +185,27 @@ impl Subscan {
         finalized_blocks.sort_by(|a, b| b.block_num.cmp(&a.block_num));
         let mut blocks = vec![];
         // from hash is none, we take just last blocks finalized from the last block
-        let mut found = if from_hash.is_none() { true } else { false };
+        let mut found = from_hash.is_none();
         let from_hash = from_hash.unwrap_or("".to_string());
         // find the block with the same hash as the previous head
+        let mut expected_block_num = None;
         for block in finalized_blocks {
             if found {
+                // blocks.push(block.clone());
+                // if blocks.len() >= n_block as usize {
+                //     break;
+                // }
+                // continue;
+                if let Some(num) = expected_block_num {
+                    if block.block_num != num {
+                        return Err(format!("Block number {} is missing", num).into());
+                    }
+                }
                 blocks.push(block.clone());
                 if blocks.len() >= n_block as usize {
                     break;
                 }
+                expected_block_num = Some(block.block_num - 1);
                 continue;
             }
             if block.hash == from_hash {

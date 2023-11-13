@@ -81,7 +81,7 @@ impl ProviderActions for Tzkt {
         blockchain.sort();
 
         set_blockchain_height_endpoint(
-            &self.endpoint.url,
+            &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
             blockchain.height,
@@ -106,7 +106,7 @@ impl Tzkt {
                 &self.endpoint.network,
             )
             .await?;
-        if res.len() == 0 {
+        if res.is_empty() {
             return Err("Error: No head found".into());
         }
         Ok(res[0].clone())

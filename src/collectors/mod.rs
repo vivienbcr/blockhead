@@ -48,7 +48,7 @@ pub async fn runner(
                 }
             })
             .collect::<Vec<_>>();
-        if results.len() == 0 {
+        if results.is_empty() {
             debug!(
                 "{:?} collector: no results for network: {:?}",
                 &protocol.to_string(),

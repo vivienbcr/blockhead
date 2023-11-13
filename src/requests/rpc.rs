@@ -182,7 +182,8 @@ impl ReqwestClient {
 
             let status = response.status().as_u16();
             debug!("POST {} {} {}ms", &url, status, time_duration);
-            track_status_code(&url, "POST", status, &protocol, &network);
+            info!("alias: {}", &self.alias);
+            track_status_code(&self.alias, "POST", status, protocol, network);
             if status != 200 {
                 error!(
                     "rpc {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
@@ -192,12 +193,12 @@ impl ReqwestClient {
                 continue;
             }
             let txt = response.text().await?;
-            set_endpoint_status_metric(&url, &protocol, &network, true);
+            set_endpoint_status_metric(&url, protocol, network, true);
             track_response_time(
-                &url,
+                &self.alias,
                 &reqwest::Method::POST,
-                &protocol,
-                &network,
+                protocol,
+                network,
                 time_duration,
             );
             let r: Result<T, Error> = serde_json::from_str(&txt);
@@ -210,8 +211,8 @@ impl ReqwestClient {
             }
         }
         // After all retry, set endpoint down and return error
-        set_endpoint_status_metric(&url, &protocol, &network, false);
-        return Err(format!("rpc {} fail after {} retry", &url, &c).into());
+        set_endpoint_status_metric(&self.alias, protocol, network, false);
+        Err(format!("rpc {} fail after {} retry", &url, &c).into())
     }
 
     pub async fn run_request<T: DeserializeOwned>(
@@ -257,7 +258,13 @@ impl ReqwestClient {
                 }
             };
             let status = response.status().as_u16();
-            track_status_code(&url, &format!("{}", &method), status, protocol, network);
+            track_status_code(
+                &self.alias,
+                &format!("{}", &method),
+                status,
+                protocol,
+                network,
+            );
 
             if status != 200 {
                 error!(
@@ -267,7 +274,7 @@ impl ReqwestClient {
                 self.iddle().await;
                 continue;
             }
-            track_response_time(&url, &method, protocol, network, time_duration);
+            track_response_time(&self.alias, &method, protocol, network, time_duration);
             let r_txt = response.text().await;
             let r_txt = match r_txt {
                 Ok(r_txt) => r_txt,
@@ -294,7 +301,7 @@ impl ReqwestClient {
             };
             return Ok(r);
         }
-        return Err(format!("{} {} fail after {} retry", &method, &url, &c).into());
+        Err(format!("{} {} fail after {} retry", &method, &url, &c).into())
     }
 }
 

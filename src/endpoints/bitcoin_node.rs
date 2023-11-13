@@ -104,7 +104,7 @@ impl ProviderActions for BitcoinNode {
         }
         blockchain.sort();
         set_blockchain_height_endpoint(
-            &self.endpoint.url,
+            &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
             blockchain.height,

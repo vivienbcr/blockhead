@@ -55,10 +55,10 @@ async fn protocol_handler(params: web::Path<Protocol>) -> HttpResponse {
             network,
             protocol.clone()
         );
-        let response = db.get_blockchain(&protocol, &network);
+        let response = db.get_blockchain(&protocol, network);
         match response {
             Ok(response) => {
-                data.insert(network.clone(), response);
+                data.insert(network, response);
             }
             Err(e) => {
                 error!(
@@ -96,7 +96,7 @@ async fn protocols_handler() -> HttpResponse {
     for (protocol, networks) in proto_net {
         for network in networks {
             let response = db.get_blockchain(&protocol, &network).unwrap();
-            data.entry(protocol.clone())
+            data.entry(protocol)
                 .or_insert(HashMap::new())
                 .insert(network, response);
         }

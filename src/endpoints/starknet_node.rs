@@ -58,7 +58,7 @@ impl ProviderActions for StarknetNode {
         }
         blockchain.sort();
         set_blockchain_height_endpoint(
-            &self.endpoint.url,
+            &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
             blockchain.height,
@@ -109,11 +109,11 @@ impl StarknetNode {
 
     async fn get_blocks_by_number(
         &mut self,
-        blocks: &Vec<u64>,
+        blocks: &[u64],
     ) -> Result<Vec<StarknetBlock>, Box<dyn std::error::Error + Send + Sync>> {
         let mut batch = Vec::new();
         let mut i = 0;
-        blocks.into_iter().for_each(|block| {
+        blocks.iter().for_each(|block| {
             let body = JsonRpcReq {
                 jsonrpc: JSON_RPC_VER.to_string(),
                 method: "starknet_getBlockWithTxs".to_string(),

@@ -69,7 +69,7 @@ impl ProviderActions for TezosNode {
         while i < n_block {
             height -= 1;
             let res = self.get_block(Some(&height.to_string())).await?;
-            let txs = res.count_tx().get("transaction").unwrap_or(&0).clone();
+            let txs = *res.count_tx().get("transaction").unwrap_or(&0);
             let datetime = DateTime::parse_from_rfc3339(&res.header.timestamp).unwrap();
             let timestamp = datetime.timestamp();
             let b = blockchain::Block {
@@ -89,7 +89,7 @@ impl ProviderActions for TezosNode {
         blockchain.sort();
 
         set_blockchain_height_endpoint(
-            &self.endpoint.url,
+            &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
             blockchain.height,
@@ -199,16 +199,15 @@ pub struct TezosBlock {
 impl TezosBlock {
     pub fn to_block(&self) -> blockchain::Block {
         let txs = self.count_tx();
-        let transactions_count = txs.get("transaction").unwrap_or(&0).clone();
+        let transactions_count = *txs.get("transaction").unwrap_or(&0);
         let datetime = DateTime::parse_from_rfc3339(&self.header.timestamp).unwrap();
         let timestamp = datetime.timestamp();
-        let b = blockchain::Block {
+        blockchain::Block {
             hash: self.hash.clone(),
             height: self.header.level,
             time: timestamp as u64,
             txs: transactions_count,
-        };
-        b
+        }
     }
     pub fn count_tx(&self) -> OpCounter {
         let mut op_count: OpCounter = HashMap::new();
@@ -219,14 +218,15 @@ impl TezosBlock {
                     let c = content.as_object();
                     if let Some(c) = c {
                         let kind = c.get("kind");
-                        if kind.is_some() {
-                            let kind = kind.unwrap().as_str().unwrap();
+                        if let Some(kind) = kind {
+                            let kind = kind.as_str().unwrap();
                             let counter = op_count.entry(kind.to_string()).or_insert(0);
                             *counter += 1;
                         }
                         let fees = c.get("fee");
-                        if fees.is_some() {
-                            let fees = fees.unwrap().as_str().unwrap();
+
+                        if let Some(fees) = fees {
+                            let fees = fees.as_str().unwrap();
                             let fees = fees.parse::<u64>().unwrap();
                             fees_sum += fees;
                         }

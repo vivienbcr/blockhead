@@ -45,7 +45,7 @@ impl ProviderActions for Blockstream {
         let mut height = tip.height;
 
         let mut blocks = self.get_blocks_from_height(height).await?;
-        while blocks.len() > 0 && blockchain.blocks.len() < n_block as usize {
+        while !blocks.is_empty() && blockchain.blocks.len() < n_block as usize {
             for block in blocks {
                 blockchain.blocks.push(blockchain::Block {
                     hash: block.id,
@@ -54,7 +54,7 @@ impl ProviderActions for Blockstream {
                     txs: block.tx_count,
                 });
             }
-            height = height - 10;
+            height -= 10;
             blocks = self.get_blocks_from_height(height).await?;
         }
         blockchain.sort();
@@ -63,7 +63,7 @@ impl ProviderActions for Blockstream {
             blockchain.blocks.truncate(n_block as usize);
         }
         set_blockchain_height_endpoint(
-            &self.endpoint.url,
+            &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
             blockchain.height,
@@ -117,7 +117,7 @@ impl Blockstream {
                 &self.endpoint.network,
             )
             .await?;
-        if res.len() == 0 {
+        if res.is_empty() {
             return Err("Error: tip not found".into());
         }
         Ok(res[0].clone())

@@ -29,22 +29,17 @@ fn run_tasks() -> Vec<tokio::task::JoinHandle<()>> {
     let config = get_configuration().unwrap();
     let protocols_networks = config.proto_providers.clone();
     protocols_networks.iter().for_each(|n| {
-        let protocol = n.0.clone();
+        let protocol = *n.0;
         let networks_map = n.1.clone();
         networks_map.iter().for_each(|n| {
-            let network = n.0.clone();
+            let network = *n.0;
             let network_options = config
                 .get_network_options(&protocol, &network)
                 .cloned()
                 .unwrap();
             let providers = n.1.clone();
             let r = tokio::task::spawn({
-                collectors::runner(
-                    protocol.clone(),
-                    network.clone(),
-                    providers.clone(),
-                    network_options,
-                )
+                collectors::runner(protocol, network, providers, network_options)
             });
             tasks.push(r);
         })
@@ -54,7 +49,7 @@ fn run_tasks() -> Vec<tokio::task::JoinHandle<()>> {
 
 async fn start_tasks(mut rx: mpsc::Receiver<bool>) -> Result<(), io::Error> {
     let mut tasks = run_tasks();
-    while let Some(_) = rx.recv().await {
+    while (rx.recv().await).is_some() {
         info!("Configuration changed, restarting {} tasks", tasks.len());
         for t in tasks.iter() {
             t.abort();
