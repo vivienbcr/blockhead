@@ -324,6 +324,7 @@ pub enum Provider {
     MoonbeamNode(EthereumNode),
     StarknetNode(StarknetNode),
     AvalancheNode(EthereumNode),
+    PolygonNode(EthereumNode),
     None,
 }
 #[cfg(test)]
@@ -388,6 +389,9 @@ impl Provider {
                 Provider::EthereumNode(EthereumNode::new(endpoint_opt, Protocol::Ethereum, n))
             }
             "ewf_node" => Provider::EwfNode(EthereumNode::new(endpoint_opt, Protocol::Ewf, n)),
+            "polygon_node" => {
+                Provider::PolygonNode(EthereumNode::new(endpoint_opt, Protocol::Polygon, n))
+            }
             "tezos_node" => Provider::TezosNode(TezosNode::new(endpoint_opt, Protocol::Tezos, n)),
             "tzkt" => Provider::Tzkt(Tzkt::new(endpoint_opt, Protocol::Tezos, n)),
             "tzstats" => Provider::TzStats(TzStats::new(endpoint_opt, Protocol::Tezos, n)),
@@ -418,6 +422,7 @@ impl Provider {
             Provider::BitcoinNode(provider) => Some(provider),
             Provider::EthereumNode(provider) => Some(provider),
             Provider::EwfNode(provider) => Some(provider),
+            Provider::PolygonNode(provider) => Some(provider),
             Provider::TezosNode(provider) => Some(provider),
             Provider::Tzkt(provider) => Some(provider),
             Provider::TzStats(provider) => Some(provider),
@@ -437,6 +442,7 @@ impl Provider {
                 | "bitcoin_node"
                 | "ethereum_node"
                 | "ewf_node"
+                | "polygon_node"
                 | "tezos_node"
                 | "tzkt"
                 | "tzstats"
@@ -588,21 +594,10 @@ impl Default for EndpointOptions {
     }
 }
 fn get_base_url(url: &str) -> String {
-    let base_url = url
-        .split('/')
-        .nth(2)
-        .unwrap_or("unknown")
-        .split(':')
-        .next()
-        .unwrap_or("unknown")
-        .to_string();
-    // if base_url split . len > 2 => take last 2
-    let mut base_url = base_url.split('.').collect::<Vec<&str>>();
-    if base_url.len() > 2 {
-        base_url = base_url[base_url.len() - 2..].to_vec();
-    }
-    base_url.join(".")
+    let base_url = url.split('/').nth(2).unwrap_or("unknown");
+    base_url.to_string()
 }
+
 impl EndpointOptions {
     /**
      * from_provider_config_f is used to create EndpointOptions from ProviderConfigF
@@ -668,6 +663,8 @@ pub enum Protocol {
     Ethereum,
     #[serde(rename = "ewf")]
     Ewf,
+    #[serde(rename = "polygon")]
+    Polygon,
     #[serde(rename = "tezos")]
     Tezos,
     #[serde(rename = "polkadot")]
@@ -688,6 +685,7 @@ impl Protocol {
             "bitcoin" => Some(Protocol::Bitcoin),
             "ethereum" => Some(Protocol::Ethereum),
             "ewf" => Some(Protocol::Ewf),
+            "polygon" => Some(Protocol::Polygon),
             "tezos" => Some(Protocol::Tezos),
             "polkadot" => Some(Protocol::Polkadot),
             "moonbeam" => Some(Protocol::Moonbeam),
@@ -703,6 +701,7 @@ impl std::fmt::Display for Protocol {
             Protocol::Bitcoin => "bitcoin",
             Protocol::Ethereum => "ethereum",
             Protocol::Ewf => "ewf",
+            Protocol::Polygon => "polygon",
             Protocol::Tezos => "tezos",
             Protocol::Polkadot => "polkadot",
             Protocol::Moonbeam => "moonbeam",
@@ -1017,15 +1016,18 @@ mod test {
     use std::ffi::OsString;
     #[test]
     fn test_prom_get_base_url() {
-        assert_eq!(get_base_url("https://api.domain.tld"), "domain.tld");
-        assert_eq!(get_base_url("https://api.domain.tld:1234"), "domain.tld");
+        assert_eq!(get_base_url("https://api.domain.tld"), "api.domain.tld");
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234"),
+            "api.domain.tld:1234"
+        );
         assert_eq!(
             get_base_url("https://api.domain.tld:1234/somethings"),
-            "domain.tld"
+            "api.domain.tld:1234"
         );
         assert_eq!(
             get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
-            "domain.tld"
+            "foo.bar.api.domain.tld:1234"
         );
     }
     #[test]
