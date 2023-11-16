@@ -12,7 +12,7 @@ use super::metrics::{
 };
 
 static REGISTRY: Lazy<Mutex<Registry>> = Lazy::new(|| Mutex::new(Registry::new()));
-//TODO: Monitor response time for each endpoint
+
 pub fn register_custom_metrics() {
     let r = REGISTRY.lock().unwrap();
     r.register(Box::new(metrics::HTTP_REQUEST_CODE.clone()))
@@ -29,6 +29,7 @@ pub fn register_custom_metrics() {
         .expect("collector can be registered");
 }
 pub fn track_status_code(
+    url: &str,
     alias: &str,
     method: &str,
     status_code: u16,
@@ -36,15 +37,19 @@ pub fn track_status_code(
     network: &Network,
 ) {
     trace!(
-        "track status code {} {} {} {} {}",
+        "track status code {} {} {} {} {} {}",
+        url,
         alias,
         method,
         status_code,
         protocol.to_string(),
         network.to_string()
     );
+
+    let u = get_base_url(url);
     metrics::HTTP_REQUEST_CODE
         .with_label_values(&[
+            &u,
             alias,
             &status_code.to_string(),
             method,
@@ -55,6 +60,7 @@ pub fn track_status_code(
 }
 
 pub fn track_response_time(
+    url: &str,
     alias: &str,
     method: &reqwest::Method,
     protocol: &Protocol,
@@ -62,15 +68,18 @@ pub fn track_response_time(
     time: u128,
 ) {
     trace!(
-        "track response time{} {} {} {} {}",
+        "track response time {} {} {} {} {} {}",
+        url,
         alias,
         method,
         protocol,
         network,
         time as f64
     );
+    let u = get_base_url(url);
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
+            &u,
             alias,
             (method.as_ref()),
             &protocol.to_string(),
@@ -79,13 +88,15 @@ pub fn track_response_time(
         .observe(time as f64);
 }
 pub fn set_blockchain_height_endpoint(
+    url: &str,
     alias: &str,
     protocol: &Protocol,
     network: &Network,
     height: u64,
 ) {
+    let u = get_base_url(url);
     BLOCKCHAIN_HEIGHT_ENDPOINT
-        .with_label_values(&[alias, &protocol.to_string(), &network.to_string()])
+        .with_label_values(&[&u, alias, &protocol.to_string(), &network.to_string()])
         .set(height as i64);
 }
 
@@ -107,25 +118,63 @@ pub fn set_blockchain_metrics(
         .set(head_txs);
 }
 
-fn get_endpoint_status_metric(alias: &str, protocol: &Protocol, network: &Network) -> bool {
-    let state = metrics::ENDPOINT_STATUS
-        .with_label_values(&[alias, &protocol.to_string(), &network.to_string()])
-        .get();
-    state == 1
-}
 pub fn set_endpoint_status_metric(
+    url: &str,
     alias: &str,
     protocol: &Protocol,
     network: &Network,
     state: bool,
 ) {
-    let m_state = get_endpoint_status_metric(alias, protocol, network);
+    let u = get_base_url(url);
+    let m_state = get_endpoint_status_metric(&u, alias, protocol, network);
     if m_state == state {
         return;
     }
     let state = if state { 1 } else { 0 };
 
     metrics::ENDPOINT_STATUS
-        .with_label_values(&[alias, &protocol.to_string(), &network.to_string()])
+        .with_label_values(&[&u, alias, &protocol.to_string(), &network.to_string()])
         .set(state);
+}
+fn get_base_url(url: &str) -> String {
+    let base_url = url
+        .split('/')
+        .nth(2)
+        .unwrap_or("unknown")
+        .split('/')
+        .next()
+        .unwrap_or("unknown");
+    base_url.to_string()
+}
+fn get_endpoint_status_metric(
+    base_url: &str,
+    alias: &str,
+    protocol: &Protocol,
+    network: &Network,
+) -> bool {
+    let state = metrics::ENDPOINT_STATUS
+        .with_label_values(&[base_url, alias, &protocol.to_string(), &network.to_string()])
+        .get();
+    state == 1
+}
+#[cfg(test)]
+mod test {
+    use crate::prom::registry::get_base_url;
+
+    #[test]
+    fn test_prom_get_base_url() {
+        assert_eq!(get_base_url("https://api.domain.tld"), "api.domain.tld");
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234"),
+            "api.domain.tld:1234"
+        );
+        assert_eq!(
+            get_base_url("https://api.domain.tld:1234/somethings"),
+            "api.domain.tld:1234"
+        );
+        assert_eq!(
+            get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
+            "foo.bar.api.domain.tld:1234"
+        );
+    }
 }
