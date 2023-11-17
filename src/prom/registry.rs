@@ -107,6 +107,14 @@ pub fn set_blockchain_metrics(
     head_time: i64,
     head_txs: i64,
 ) {
+    // If current height is higher than the new height, do not update
+    let m_state = BLOCKCHAIN_HEIGHT
+        .with_label_values(&[&protocol.to_string(), &network.to_string()])
+        .get();
+    if m_state >= head_height {
+        return;
+    }
+
     BLOCKCHAIN_HEIGHT
         .with_label_values(&[&protocol.to_string(), &network.to_string()])
         .set(head_height);
