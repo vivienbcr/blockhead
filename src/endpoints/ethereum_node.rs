@@ -94,6 +94,7 @@ impl EthereumNode {
         let req = match block_numbers {
             Some(block_numbers) => {
                 let mut batch = Vec::new();
+                let mut id = 1;
                 block_numbers.iter().for_each(|block_number| {
                     let body = JsonRpcReq {
                         jsonrpc: JSON_RPC_VER.to_string(),
@@ -102,8 +103,9 @@ impl EthereumNode {
                             JsonRpcParams::String(format!("0x{:x}", block_number)),
                             JsonRpcParams::Bool(txs),
                         ],
-                        id: 1,
+                        id: id,
                     };
+                    id += 1;
                     batch.push(body);
                 });
                 JsonRpcReqBody::Batch(batch)
