@@ -719,6 +719,8 @@ pub enum Network {
     Goerli,
     #[serde(rename = "sepolia")]
     Sepolia,
+    #[serde(rename = "holesky")]
+    Holesky,
     #[serde(rename = "volta")]
     Volta,
     #[serde(rename = "ghostnet")]
@@ -741,6 +743,7 @@ impl Network {
             "testnet" => Some(Network::Testnet),
             "goerli" => Some(Network::Goerli),
             "sepolia" => Some(Network::Sepolia),
+            "holesky" => Some(Network::Holesky),
             "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
             "kusama" => Some(Network::Kusama),
@@ -759,6 +762,7 @@ impl std::fmt::Display for Network {
             Network::Testnet => "testnet",
             Network::Goerli => "goerli",
             Network::Sepolia => "sepolia",
+            Network::Holesky => "holesky",
             Network::Volta => "volta",
             Network::Ghostnet => "ghostnet",
             Network::Kusama => "kusama",
