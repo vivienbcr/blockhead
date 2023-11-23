@@ -8,7 +8,7 @@ use crate::{
 };
 use reqwest::{
     header::{HeaderMap, HeaderName},
-    Client,
+    Client, StatusCode,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Error;
@@ -139,7 +139,7 @@ impl ReqwestClient {
                 return Err(Box::new(RequestError::DeserializeRequestError(e)));
             }
         };
-        debug!("RPC request: {}", &b);
+        trace!("RPC request: {}", &b);
         let url = self.config.url.clone();
         let url = match url {
             Some(url) => url,
@@ -172,19 +172,40 @@ impl ReqwestClient {
                         "rpc {} request {} return error code {:?} source: {}, retrying in {} seconds, tries {} on {} ",
                         &url, &b,e.status(),e.to_string(),  self.config.delay, i, self.config.retry
                     );
+                    // As we wait for a response to continue to process data, iter on timeout will take too much time
                     if e.is_timeout() {
+                        error!("Timeout detected skip this requests...");
+                        track_status_code(&url, &self.alias, "POST", 504, protocol, network);
                         return Err(Box::new(e));
                     }
+                    track_status_code(
+                        &url,
+                        &self.alias,
+                        "POST",
+                        e.status()
+                            .unwrap_or(StatusCode::SERVICE_UNAVAILABLE)
+                            .as_u16(),
+                        protocol,
+                        network,
+                    );
                     self.iddle().await;
                     continue;
                 }
             };
 
             let status = response.status().as_u16();
-            debug!("POST {} {} {}ms", &url, status, time_duration);
-            info!("alias: {}", &self.alias);
-            track_status_code(&self.alias, "POST", status, protocol, network);
-            if status != 200 {
+            debug!(
+                "POST {} {} {} {}ms",
+                &url, &self.alias, status, time_duration
+            );
+            track_status_code(&url, &self.alias, "POST", status, protocol, network);
+            if status == StatusCode::TOO_MANY_REQUESTS.as_u16() {
+                error!("rpc {} return too many request, skipping this request", url,);
+                return Err(Box::new(RequestError::EndpointReachRateLimit(
+                    url.to_string(),
+                )));
+            }
+            if status != StatusCode::OK.as_u16() {
                 error!(
                     "rpc {} status code {}, retrying in {} seconds, tries {} on {}, body: {}",
                     url, status, self.config.delay, i, self.config.retry, &b
@@ -193,8 +214,9 @@ impl ReqwestClient {
                 continue;
             }
             let txt = response.text().await?;
-            set_endpoint_status_metric(&url, protocol, network, true);
+            set_endpoint_status_metric(&url, &self.alias, protocol, network, true);
             track_response_time(
+                &url,
                 &self.alias,
                 &reqwest::Method::POST,
                 protocol,
@@ -211,7 +233,7 @@ impl ReqwestClient {
             }
         }
         // After all retry, set endpoint down and return error
-        set_endpoint_status_metric(&self.alias, protocol, network, false);
+        set_endpoint_status_metric(&url, &self.alias, protocol, network, false);
         Err(format!("rpc {} fail after {} retry", &url, &c).into())
     }
 
@@ -259,6 +281,7 @@ impl ReqwestClient {
             };
             let status = response.status().as_u16();
             track_status_code(
+                &url,
                 &self.alias,
                 &format!("{}", &method),
                 status,
@@ -274,7 +297,7 @@ impl ReqwestClient {
                 self.iddle().await;
                 continue;
             }
-            track_response_time(&self.alias, &method, protocol, network, time_duration);
+            track_response_time(&url, &self.alias, &method, protocol, network, time_duration);
             let r_txt = response.text().await;
             let r_txt = match r_txt {
                 Ok(r_txt) => r_txt,

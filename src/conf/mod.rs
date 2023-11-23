@@ -219,10 +219,11 @@ where
                                     );
 
                                     debug!("endpoint_opt: {:?}", endpoint_opts);
-                                    // add alias to alias list
-
+                                    // Alias should be unique per protocol / network
                                     if !alias_list.contains(&endpoint_opts.alias) {
-                                        alias_list.push(endpoint_opts.alias.clone());
+                                        if endpoint_opts.alias != default_alias(){
+                                            alias_list.push(endpoint_opts.alias.clone());
+                                        }
                                     } else {
                                         panic!("Found duplicated alias {} in config file at protocol: {} network: {} ", endpoint_opts.alias, protocol, network);
                                     }
@@ -593,10 +594,6 @@ impl Default for EndpointOptions {
         }
     }
 }
-fn get_base_url(url: &str) -> String {
-    let base_url = url.split('/').nth(2).unwrap_or("unknown");
-    base_url.to_string()
-}
 
 impl EndpointOptions {
     /**
@@ -612,7 +609,7 @@ impl EndpointOptions {
         if let Some(url) = provider.url {
             endpoint_opt.url = Some(url);
         }
-        endpoint_opt.alias = get_base_url(endpoint_opt.url.clone().unwrap().as_str());
+        // endpoint_opt.alias = get_base_url(endpoint_opt.url.clone().unwrap().as_str());
 
         if let Some(options) = provider.options {
             if let Some(retry) = options.retry {
@@ -650,7 +647,7 @@ impl EndpointOptions {
             timeout: default_endpoint_request_timeout(),
             headers,
             basic_auth,
-            alias: get_base_url(url),
+            alias: DEFAULT_ALIAS.to_string(),
         }
     }
 }
@@ -722,6 +719,8 @@ pub enum Network {
     Goerli,
     #[serde(rename = "sepolia")]
     Sepolia,
+    #[serde(rename = "holesky")]
+    Holesky,
     #[serde(rename = "volta")]
     Volta,
     #[serde(rename = "ghostnet")]
@@ -744,6 +743,7 @@ impl Network {
             "testnet" => Some(Network::Testnet),
             "goerli" => Some(Network::Goerli),
             "sepolia" => Some(Network::Sepolia),
+            "holesky" => Some(Network::Holesky),
             "volta" => Some(Network::Volta),
             "ghostnet" => Some(Network::Ghostnet),
             "kusama" => Some(Network::Kusama),
@@ -762,6 +762,7 @@ impl std::fmt::Display for Network {
             Network::Testnet => "testnet",
             Network::Goerli => "goerli",
             Network::Sepolia => "sepolia",
+            Network::Holesky => "holesky",
             Network::Volta => "volta",
             Network::Ghostnet => "ghostnet",
             Network::Kusama => "kusama",
@@ -882,7 +883,7 @@ pub const DEFAULT_DATABASE_KEEP_HISTORY: u32 = 1000;
 fn default_database_keep_history() -> u32 {
     DEFAULT_DATABASE_KEEP_HISTORY
 }
-pub const DEFAULT_ALIAS: &str = "unknown";
+pub const DEFAULT_ALIAS: &str = "";
 fn default_alias() -> String {
     DEFAULT_ALIAS.to_string()
 }
@@ -1014,22 +1015,7 @@ pub async fn watch_configuration_change(tx: mpsc::Sender<bool>) -> Result<(), io
 mod test {
     use crate::{conf::*, tests};
     use std::ffi::OsString;
-    #[test]
-    fn test_prom_get_base_url() {
-        assert_eq!(get_base_url("https://api.domain.tld"), "api.domain.tld");
-        assert_eq!(
-            get_base_url("https://api.domain.tld:1234"),
-            "api.domain.tld:1234"
-        );
-        assert_eq!(
-            get_base_url("https://api.domain.tld:1234/somethings"),
-            "api.domain.tld:1234"
-        );
-        assert_eq!(
-            get_base_url("https://foo.bar.api.domain.tld:1234/somethings/else"),
-            "foo.bar.api.domain.tld:1234"
-        );
-    }
+
     #[test]
     // test_config_endpoint
 

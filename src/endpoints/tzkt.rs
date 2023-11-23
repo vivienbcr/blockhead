@@ -81,6 +81,7 @@ impl ProviderActions for Tzkt {
         blockchain.sort();
 
         set_blockchain_height_endpoint(
+            &self.endpoint.url,
             &self.endpoint.reqwest.config.alias,
             &self.endpoint.protocol,
             &self.endpoint.network,
