@@ -178,7 +178,8 @@ mod tests {
     async fn blockcypherget_chain_height() {
         tests::setup();
         let url = env::var("BLOCKCYPHER_URL").unwrap();
-        let mut blockcypher = Blockcypher::test_new(&url, Protocol::Bitcoin, Network::Mainnet);
+        let mut blockcypher =
+            Blockcypher::test_new(&url, Protocol::Bitcoin, String::from("mainnet"));
         let chain_state = blockcypher.get_chain_height().await.unwrap();
         assert!(chain_state.height > 0);
     }
@@ -189,7 +190,8 @@ mod tests {
         let n_block = 5;
         let height = 100;
         let url = env::var("BLOCKCYPHER_URL").unwrap();
-        let mut blockcypher = Blockcypher::test_new(&url, Protocol::Bitcoin, Network::Mainnet);
+        let mut blockcypher =
+            Blockcypher::test_new(&url, Protocol::Bitcoin, String::from("mainnet"));
         let res = blockcypher
             .get_blocks_from_height(height, n_block)
             .await

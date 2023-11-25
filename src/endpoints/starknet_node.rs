@@ -187,7 +187,7 @@ mod tests {
         let mut starknet_node = StarknetNode::test_new(
             &env::var("STARKNET_NODE_URL").unwrap(),
             Protocol::Starknet,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let head = starknet_node.get_head().await;
         assert!(head.is_ok());
@@ -201,7 +201,7 @@ mod tests {
         let mut starknet_node = StarknetNode::test_new(
             &env::var("STARKNET_NODE_URL").unwrap(),
             Protocol::Starknet,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let head = starknet_node.get_head().await.unwrap();
         let mut block_numbers = Vec::new();

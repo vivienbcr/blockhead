@@ -216,7 +216,7 @@ mod tests {
     async fn tzkt_get_block_full() {
         tests::setup();
         let url = "https://api.ghostnet.tzkt.io";
-        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, Network::Ghostnet);
+        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, String::from("ghostnet"));
         let r = tzkt.get_block_full(123456).await.unwrap();
         assert_eq!(r.level, 123456);
     }
@@ -224,7 +224,7 @@ mod tests {
     async fn tzkt_get_head() {
         tests::setup();
         let url = "https://api.ghostnet.tzkt.io";
-        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, Network::Ghostnet);
+        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, String::from("ghostnet"));
         let r = tzkt.get_head().await.unwrap();
         assert!(r.level > 123456);
     }
@@ -232,7 +232,7 @@ mod tests {
     async fn tzkt_parse_top() {
         tests::setup();
         let url = "https://api.ghostnet.tzkt.io";
-        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, Network::Ghostnet);
+        let mut tzkt = Tzkt::test_new(url, Protocol::Tezos, String::from("ghostnet"));
         let r = tzkt.parse_top_blocks(5, None).await.unwrap();
         assert_eq!(r.blocks.len(), 5);
     }

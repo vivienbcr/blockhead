@@ -281,7 +281,7 @@ mod tests {
         let mut subscan = Subscan::test_new(
             "https://polkadot.api.subscan.io",
             Protocol::Polkadot,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let blockchain = subscan.parse_top_blocks(5, None).await;
         assert!(blockchain.is_ok(), "Subscan should return a blockchain");
