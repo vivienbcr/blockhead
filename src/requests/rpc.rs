@@ -354,7 +354,7 @@ mod tests {
                 None,
                 url,
                 &Protocol::Tezos,
-                &Network::Mainnet,
+                &String::from("mainnet"),
             )
             .await;
         assert!(res.is_ok());

@@ -32,7 +32,7 @@ fn run_tasks() -> Vec<tokio::task::JoinHandle<()>> {
         let protocol = *n.0;
         let networks_map = n.1.clone();
         networks_map.iter().for_each(|n| {
-            let network = *n.0;
+            let network = n.0.clone();
             let network_options = config
                 .get_network_options(&protocol, &network)
                 .cloned()

@@ -254,7 +254,7 @@ mod tests {
     async fn tezos_get_block() {
         tests::setup();
         let url = env::var("TEZOS_NODE_URL").unwrap();
-        let mut tezos_node = TezosNode::test_new(&url, Protocol::Tezos, Network::Mainnet);
+        let mut tezos_node = TezosNode::test_new(&url, Protocol::Tezos, String::from("mainnet"));
         let r = tezos_node.get_block(None).await;
         assert!(r.is_ok());
         let block_head = r.unwrap();
@@ -267,7 +267,7 @@ mod tests {
     async fn tezos_count_tx() {
         tests::setup();
         let url = env::var("TEZOS_NODE_URL").unwrap();
-        let mut tezos_node = TezosNode::test_new(&url, Protocol::Tezos, Network::Mainnet);
+        let mut tezos_node = TezosNode::test_new(&url, Protocol::Tezos, String::from("mainnet"));
         let r = tezos_node.get_block(None).await;
 
         assert!(r.is_ok());
@@ -276,7 +276,7 @@ mod tests {
     async fn tezos_parse_top_blocks() {
         tests::setup();
         let url = env::var("TEZOS_NODE_URL").unwrap();
-        let mut tezos_node = TezosNode::test_new(&url, Protocol::Tezos, Network::Mainnet);
+        let mut tezos_node = TezosNode::test_new(&url, Protocol::Tezos, String::from("mainnet"));
         let r = tezos_node.parse_top_blocks(10, None).await;
         assert!(r.is_ok());
         let blockchain = r.unwrap();

@@ -211,7 +211,7 @@ mod tests {
         let mut endpoint = PolkadotNode::test_new(
             "https://rpc.polkadot.io",
             Protocol::Polkadot,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let res = endpoint.parse_top_blocks(10, None).await;
         assert!(res.is_ok());
@@ -225,7 +225,7 @@ mod tests {
         let mut endpoint = PolkadotNode::test_new(
             "https://rpc.polkadot.io",
             Protocol::Polkadot,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let res = endpoint.get_finalized_head().await;
         assert!(res.is_ok());
@@ -237,7 +237,7 @@ mod tests {
         let mut endpoint = PolkadotNode::test_new(
             "https://rpc.polkadot.io",
             Protocol::Polkadot,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let res = endpoint
             .get_blocks(vec![
@@ -266,7 +266,7 @@ mod tests {
         let mut endpoint = PolkadotNode::test_new(
             "https://rpc.polkadot.io",
             Protocol::Polkadot,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let block_hashs = vec![
             "0xf752e2ec759fc921b7fb63f5c4c3798ed608059dc239dfb2f2d41bb50190dd35".to_string(),

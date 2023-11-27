@@ -216,7 +216,7 @@ mod test {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
         let mut bitcoin_node =
-            BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
+            BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, String::from("mainnet"));
         let res = bitcoin_node.get_best_block_hash().await;
         assert!(
             res.is_ok(),
@@ -230,7 +230,7 @@ mod test {
         tests::setup();
         let url = env::var("BITCOIN_NODE_URL").unwrap();
         let mut bitcoin_node =
-            BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, Network::Mainnet);
+            BitcoinNode::test_new(url.as_str(), Protocol::Bitcoin, String::from("mainnet"));
         let res = bitcoin_node
             .get_block(&"00000000000000000005bdd33e8c4ac8b3b1754f72416b9cb88ce278ea25f6ce")
             .await;

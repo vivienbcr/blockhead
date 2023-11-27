@@ -103,7 +103,7 @@ impl EthereumNode {
                             JsonRpcParams::String(format!("0x{:x}", block_number)),
                             JsonRpcParams::Bool(txs),
                         ],
-                        id: id,
+                        id,
                     };
                     id += 1;
                     batch.push(body);
@@ -214,7 +214,7 @@ mod test {
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
             Protocol::Ethereum,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let block = ethereum_node
             .get_block_by_number(None, false)
@@ -230,7 +230,7 @@ mod test {
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
             Protocol::Ethereum,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let block = ethereum_node
             .get_block_by_number(None, false)
@@ -269,7 +269,7 @@ mod test {
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("ETHEREUM_NODE_URL").unwrap(),
             Protocol::Ethereum,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let res = ethereum_node.parse_top_blocks(5, None).await.unwrap();
         assert_eq!(res.blocks.len(), 5);
@@ -280,7 +280,7 @@ mod test {
         let mut ethereum_node = EthereumNode::test_new(
             &env::var("EWF_NODE_URL").unwrap(),
             Protocol::Ethereum,
-            Network::Mainnet,
+            String::from("mainnet"),
         );
         let res = ethereum_node.parse_top_blocks(5, None).await.unwrap();
         assert_eq!(res.blocks.len(), 5);

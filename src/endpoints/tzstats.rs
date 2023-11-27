@@ -178,7 +178,8 @@ mod tests {
         tests::setup();
         let api_key = env::var("TZSTATS_API_KEY").unwrap();
         let url = "https://api.ghost.tzpro.io";
-        let mut tzstats = TzStats::test_new(url, Protocol::Tezos, Network::Ghostnet, &api_key);
+        let mut tzstats =
+            TzStats::test_new(url, Protocol::Tezos, String::from("ghostnet"), &api_key);
         let blockchain = tzstats
             .parse_top_blocks(5, None)
             .await

@@ -82,7 +82,7 @@ pub fn get_enabled_protocol_network() -> Option<HashMap<Protocol, Vec<Network>>>
     for (proto, networks) in &config.proto_opts {
         let mut net_names = Vec::new();
         for net in networks {
-            net_names.push(*net.0);
+            net_names.push(net.0.clone());
         }
         res.insert(*proto, net_names);
     }
@@ -165,13 +165,7 @@ where
             let s: Value = serde_json::from_str(&proto_config.to_string()).unwrap();
             s.as_object().unwrap().iter().for_each(|(net, opts)| {
                 debug!("Deserialize network {}", net);
-                let network = Network::from(net.clone());
-                let network = match network {
-                    Some(n) => n,
-                    _ => {
-                        panic!("Unknown network: {} found in configuration file for protocol {}", net, proto)
-                    }
-                };
+                let network = net.clone();
                 let o: Value = serde_json::from_str(&opts.to_string()).unwrap();
                 /*
                  * Deserialize Network options
@@ -186,10 +180,10 @@ where
                             )
                             .unwrap();
 
-                        net_opts.insert(network, net_opt);
+                        net_opts.insert(network.clone(), net_opt);
                     }
                     None => {
-                        net_opts.insert(network, global.networks_options.clone());
+                        net_opts.insert(network.clone(), global.networks_options.clone());
                     }
                 }
                 /*
@@ -258,7 +252,7 @@ where
                 debug!(
                     "Protocol: {} Network: {} Providers: {}",
                     protocol.to_string(),
-                    network.to_string(),
+                    network,
                     providers.len()
                 );
                 net_providers.insert(network, providers);
@@ -709,75 +703,9 @@ impl std::fmt::Display for Protocol {
         write!(f, "{}", s)
     }
 }
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, Hash, PartialEq, Copy)]
-pub enum Network {
-    #[serde(rename = "mainnet")]
-    Mainnet,
-    #[serde(rename = "testnet")]
-    Testnet,
-    #[serde(rename = "goerli")]
-    Goerli,
-    #[serde(rename = "sepolia")]
-    Sepolia,
-    #[serde(rename = "holesky")]
-    Holesky,
-    #[serde(rename = "volta")]
-    Volta,
-    #[serde(rename = "mumbai")]
-    Mumbai,
-    #[serde(rename = "ghostnet")]
-    Ghostnet,
-    #[serde(rename = "kusama")]
-    Kusama,
-    #[serde(rename = "westend")]
-    Westend,
-    #[serde(rename = "moonriver")]
-    Moonriver,
-    #[serde(rename = "testnet2")]
-    Testnet2,
-    #[serde(rename = "fuji")]
-    Fuji,
-}
-impl Network {
-    fn from(s: String) -> Option<Self> {
-        match s.as_str() {
-            "mainnet" => Some(Network::Mainnet),
-            "testnet" => Some(Network::Testnet),
-            "goerli" => Some(Network::Goerli),
-            "sepolia" => Some(Network::Sepolia),
-            "holesky" => Some(Network::Holesky),
-            "volta" => Some(Network::Volta),
-            "mumbai" => Some(Network::Mumbai),
-            "ghostnet" => Some(Network::Ghostnet),
-            "kusama" => Some(Network::Kusama),
-            "westend" => Some(Network::Westend),
-            "moonriver" => Some(Network::Moonriver),
-            "testnet2" => Some(Network::Testnet2),
-            "fuji" => Some(Network::Fuji),
-            _ => None,
-        }
-    }
-}
-impl std::fmt::Display for Network {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Network::Mainnet => "mainnet",
-            Network::Testnet => "testnet",
-            Network::Goerli => "goerli",
-            Network::Sepolia => "sepolia",
-            Network::Holesky => "holesky",
-            Network::Volta => "volta",
-            Network::Mumbai => "mumbai",
-            Network::Ghostnet => "ghostnet",
-            Network::Kusama => "kusama",
-            Network::Westend => "westend",
-            Network::Moonriver => "moonriver",
-            Network::Testnet2 => "testnet2",
-            Network::Fuji => "fuji",
-        };
-        write!(f, "{}", s)
-    }
-}
+
+pub type Network = String;
+
 #[derive(Serialize, Debug, Clone)]
 pub struct Endpoint {
     pub url: String,
@@ -1149,7 +1077,7 @@ mod test {
 
         // Test bitcoin provider
         let bitcoin_net_provider = config.proto_providers.get(&Protocol::Bitcoin).unwrap();
-        let bitcoin_mainnet_providers = bitcoin_net_provider.get(&Network::Mainnet).unwrap();
+        let bitcoin_mainnet_providers = bitcoin_net_provider.get("mainnet").unwrap();
         assert_eq!(
             bitcoin_mainnet_providers.len(),
             4,
@@ -1271,15 +1199,14 @@ mod test {
             "Bitcoin mainnet blockcypher url should be set"
         );
         let bitcoin_network_options = config.proto_opts.get(&Protocol::Bitcoin).unwrap();
-        let bitcoin_mainnet_network_options =
-            bitcoin_network_options.get(&Network::Mainnet).unwrap();
+        let bitcoin_mainnet_network_options = bitcoin_network_options.get("mainnet").unwrap();
         assert_eq!(
             bitcoin_mainnet_network_options.head_length, 9,
             "Bitcoin mainnet head_length should be set to 9"
         );
         // Test ethereum provider
         let ethereum_net_provider = config.proto_providers.get(&Protocol::Ethereum).unwrap();
-        let ethereum_mainnet_providers = ethereum_net_provider.get(&Network::Mainnet).unwrap();
+        let ethereum_mainnet_providers = ethereum_net_provider.get("mainnet").unwrap();
         assert_eq!(
             ethereum_mainnet_providers.len(),
             1,
@@ -1311,8 +1238,7 @@ mod test {
             "First Ethereum mainnet rate should be equal to 24"
         );
         let ethereum_network_options = config.proto_opts.get(&Protocol::Ethereum).unwrap();
-        let ethereum_mainnet_network_options =
-            ethereum_network_options.get(&Network::Mainnet).unwrap();
+        let ethereum_mainnet_network_options = ethereum_network_options.get("mainnet").unwrap();
         assert_eq!(
             ethereum_mainnet_network_options.head_length,
             config.global.networks_options.head_length,
@@ -1323,7 +1249,7 @@ mod test {
             "Ethereum mainnet tick_rate should be eq to global tick_rate"
         );
         // Test Ethereum sepolia
-        let ethereum_sepolia_providers = ethereum_net_provider.get(&Network::Sepolia).unwrap();
+        let ethereum_sepolia_providers = ethereum_net_provider.get("sepolia").unwrap();
         assert_eq!(
             ethereum_sepolia_providers.len(),
             1,
@@ -1354,8 +1280,7 @@ mod test {
             e.config.rate, 27,
             "First Ethereum sepolia rate should be equal to 27"
         );
-        let ethereum_sepolia_network_options =
-            ethereum_network_options.get(&Network::Sepolia).unwrap();
+        let ethereum_sepolia_network_options = ethereum_network_options.get("sepolia").unwrap();
         assert_eq!(
             ethereum_sepolia_network_options.head_length, config.global.networks_options.head_length,
             "Ethereum sepolia head_length should be set to config.global.networks_options.head_length"
@@ -1426,7 +1351,7 @@ mod test {
         let bitcoin_provider = proto_providers.get(&Protocol::Bitcoin).unwrap();
         // should contain network mainnet
         assert_eq!(
-            bitcoin_provider.contains_key(&Network::Mainnet),
+            bitcoin_provider.contains_key("mainnet"),
             true,
             "bitcoin_provider should contain mainnet"
         );
@@ -1437,12 +1362,12 @@ mod test {
         );
         // sould contain 2 providers
         assert_eq!(
-            bitcoin_provider.get(&Network::Mainnet).unwrap().len(),
+            bitcoin_provider.get("mainnet").unwrap().len(),
             2,
             "bitcoin_provider mainnet should have 2 endpoints"
         );
         // Each provider should have default values
-        let mainnet_providers = bitcoin_provider.get(&Network::Mainnet).unwrap();
+        let mainnet_providers = bitcoin_provider.get("mainnet").unwrap();
         let expected_urls = vec![
             "https://rpc-bitcoin-1.com".to_string(),
             "https://rpc-bitcoin-2.com".to_string(),
