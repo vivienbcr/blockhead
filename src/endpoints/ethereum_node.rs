@@ -195,7 +195,7 @@ pub struct EthBlock {
     pub timestamp: u64,
     //TODO: Some Eth forks use totalDifficulty > u128, we need use big number crate to support it
     // while we don't need to use it now, so just use String
-    pub total_difficulty: String,
+    pub total_difficulty: Option<String>,
     pub transactions_root: String,
     pub uncles: Vec<String>,
     pub transactions: Vec<String>,
